@@ -52,6 +52,25 @@ The rest of this document helps you navigate the codebase and make changes
 effectively. Think of these as good defaults; explicit instructions from the
 developer override anything here.
 
+## Working together
+
+How Joca and the agent collaborate. This section wins when it overlaps with
+anything below.
+
+- **Ask at forks, don't guess.** Anything touching product or architecture —
+  two reasonable designs, an unclear requirement — stops for a question. Small,
+  reversible details don't need one.
+- **Short plan first.** Multi-step work (a phase, a new flow) starts with a
+  brief written plan. Building starts after approval. Small tasks skip the plan.
+- **Walkthroughs, not receipts.** When work lands, explain the reasoning and
+  the key decisions, not just what changed. Test output for logic, screenshots
+  or video for UI.
+- **Findings, not drive-bys.** Rot spotted outside the task gets reported in
+  one sentence. Fix it on the spot only if trivial; otherwise ask whether it
+  goes on the list as a pending fix.
+- **English inside, Spanish outside.** Code, docs, commits, and agent chatter
+  in English. Anything the user reads (UI, reports, emails) in es-PE.
+
 ## A small glossary
 
 Use this language when communicating:
@@ -137,6 +156,9 @@ Real quotations are the most sensitive data we hold. Treat them accordingly:
 
 - Smallest proof that the change works. `pnpm test` (Vitest, deterministic, free,
   runs in CI) for the files you touched; targeted typecheck for the scope you changed.
+- **MVP testing bar:** payments, state transitions, idempotency, and file
+  immutability always ship with tests. Everything else is tested lightly or as
+  its behavior stabilizes — a prototype doesn't earn a suite before it settles.
 - Test meaningful logic or observable behavior: state transitions, idempotency,
   immutability, reclaim. Do not assert component markup, callback wiring, or mirrors
   of the implementation.

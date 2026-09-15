@@ -71,6 +71,13 @@ in React (phase 1); the served copy is `public/mockup/`, the reference
 original stays in `docs/mockup/` — keep them in sync by re-copying, or delete
 both when React takes over.
 
+### D6 — AGENTS.md encodes Joca's taste (2026-09-15)
+Two interview rounds replaced the opinionated defaults: ask at forks (never
+guess on product/architecture), short written plan + approval before
+multi-step work, walkthrough reports, findings-reported-not-fixed unless
+trivial, EN inside / es-PE outside, tests mandatory only for money + states +
+idempotency + immutability, commits only on explicit ask.
+
 ## Phase status
 
 - [x] 0. Scaffold (this file's baseline)
