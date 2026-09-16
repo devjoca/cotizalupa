@@ -1,7 +1,15 @@
-import { useEffect, useRef } from "react";
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 
-import landingBody from "./landing-body.html?raw";
+import landingCss from "../styles/landing.css?url";
+import { Hero } from "../components/landing/Hero";
+import { RoleCards } from "../components/landing/RoleCards";
+import { Example } from "../components/landing/Example";
+import { Method } from "../components/landing/Method";
+import { Pricing } from "../components/landing/Pricing";
+import { Faq } from "../components/landing/Faq";
+import { Closing, Footer } from "../components/landing/Closing";
+import { ReviewDialog } from "../components/landing/ReviewDialog";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -16,28 +24,61 @@ export const Route = createFileRoute("/")({
       },
       { name: "theme-color", content: "#b33127" },
     ],
-    links: [{ rel: "stylesheet", href: "/mockup/style.css" }],
+    links: [{ rel: "stylesheet", href: landingCss }],
   }),
   component: Landing,
 });
 
-// Temporary scaffold: serves the mockup verbatim (vanilla HTML + JS) until the
-// landing/upload flow is rebuilt in React (phase 1). The script runs top-level
-// (no DOMContentLoaded), so it must execute after the markup is injected.
 function Landing() {
-  const ref = useRef<HTMLDivElement>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [flowKey, setFlowKey] = useState(0);
 
-  useEffect(() => {
-    const host = ref.current;
-    if (!host) return;
-    host.innerHTML = landingBody;
-    const script = document.createElement("script");
-    script.src = "/mockup/app.js";
-    host.appendChild(script);
-    return () => {
-      host.innerHTML = "";
-    };
-  }, []);
+  // Iteration 1 is cliente-only: every entry point opens the same client flow.
+  function startFlow() {
+    setFlowKey((key) => key + 1);
+    setDialogOpen(true);
+  }
 
-  return <div ref={ref} />;
+  return (
+    <>
+      <header>
+        <a href="#" className="brand" aria-label="CotizaLupa, inicio">
+          Cotiza<span>Lupa</span>
+          <span className="brand-period" aria-hidden="true">
+            .
+          </span>
+        </a>
+        <nav aria-label="Principal">
+          <a href="#como">Cómo funciona</a>
+          <a href="#ejemplo">Ver un ejemplo</a>
+          <a href="#precio">Precio</a>
+        </nav>
+        <button className="button small dark" onClick={startFlow}>
+          Revisar cotización <span aria-hidden="true">↗</span>
+        </button>
+      </header>
+      <main>
+        <Hero onStart={startFlow} />
+        <div className="category-strip">
+          <span>PARA ACUERDOS GRANDES Y PEQUEÑOS</span>
+          <div>
+            Muebles a medida <i>✳</i> Remodelaciones <i>✳</i> Desarrollo web{" "}
+            <i>✳</i> Eventos <i>✳</i> Y mucho más
+          </div>
+        </div>
+        <RoleCards onStart={startFlow} />
+        <Example />
+        <Method />
+        <Pricing onStart={startFlow} />
+        <Faq />
+        <Closing onStart={startFlow} />
+      </main>
+      <Footer />
+      <ReviewDialog
+        key={flowKey}
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+      />
+    </>
+  );
 }

@@ -61,7 +61,7 @@ top: `src/server/*`, `src/db/*`, `src/lib/schemas.ts` (real `PrecheckSchema`),
 `docs/mockup/` (read-only reference). Verified: install, `vitest run`
 (12 skipped / 0 failed), `vite build`, dev SSR 200 on `/` and `/r/:token`.
 
-### D5 — Landing serves the mockup verbatim (2026-09-15)
+### D5 — Landing serves the mockup verbatim (2026-09-15, retired 2026-09-16)
 `/` renders `docs/mockup/index.html`'s body (imported `?raw`) with its
 stylesheet and vanilla JS from `public/mockup/`, injected by effect because
 the script runs top-level and `innerHTML` scripts don't execute. Starter
@@ -70,6 +70,15 @@ mockup's own typography. Temporary until the landing/upload flow is rebuilt
 in React (phase 1); the served copy is `public/mockup/`, the reference
 original stays in `docs/mockup/` — keep them in sync by re-copying, or delete
 both when React takes over.
+
+Retired: `/` is now SSR React (`src/routes/index.tsx` + `src/components/landing/`,
+plain CSS tokens in `src/styles/landing.css`, zero new deps — no Tailwind, no
+component library for two pages). The `?raw` shim, `landing-body.html`, and
+`public/mockup/` are deleted; `docs/mockup/` stays as the frozen visual
+baseline. Dropped in the port: the unreachable `proveedor` example dataset and
+the `document.modelContext` demo-tool registration (its contract includes the
+proveedor path closed in iteration 1). Flow logic lives in a pure
+`review-flow.ts` reducer + `tests/review-flow.test.ts`.
 
 ### D6 — AGENTS.md encodes Joca's taste (2026-09-15)
 Two interview rounds replaced the opinionated defaults: ask at forks (never
