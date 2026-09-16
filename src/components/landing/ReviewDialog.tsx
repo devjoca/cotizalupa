@@ -1,10 +1,13 @@
 import { useEffect, useReducer, useRef, useState } from "react";
 
-import { CATEGORIES, MOMENTS, OTHER_CATEGORY } from "./content";
+import { ReportView, type AnalyzeResult } from "../ReportView";
+import { fileToUpload } from "#/lib/fileBase64";
+import { CATEGORIES, MOMENTS, OTHER_CATEGORY } from "#/lib/reviewContext";
+import { analyzeFiles } from "#/server/analyze";
 import {
   flowReducer,
   initialFlowState,
-  validatePickedFile,
+  validatePickedFiles,
   type FlowFields,
 } from "./review-flow";
 
@@ -24,10 +27,14 @@ function scrollToExample() {
 
 export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
   const [state, dispatch] = useReducer(flowReducer, initialFlowState);
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [result, setResult] = useState<AnalyzeResult | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const openerRef = useRef<Element | null>(null);
+  const requestIdRef = useRef(0);
 
   // Opening resets the flow and shows the modal; closing returns focus.
   useEffect(() => {
@@ -35,15 +42,20 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
     if (!dialog) return;
     if (!open) return;
     openerRef.current = document.activeElement;
+    requestIdRef.current += 1;
     dispatch({ type: "open" });
-    setFile(null);
+    setFiles([]);
+    setResult(null);
+    setAnalysisError(null);
+    setAnalyzing(false);
     if (!dialog.open) dialog.showModal();
-  }, [open ]);
+  }, [open]);
 
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
     const handleClose = () => {
+      requestIdRef.current += 1;
       (openerRef.current as HTMLElement | null)?.focus?.();
       onClose();
     };
@@ -60,15 +72,15 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
     if (dialogRef.current) dialogRef.current.scrollTop = 0;
   }, [open, state.step]);
 
-  function pickFile(picked: File | null | undefined) {
-    const result = validatePickedFile(picked);
+  function pickFiles(picked: readonly File[]) {
+    const result = validatePickedFiles(picked);
     if ("error" in result) {
-      setFile(null);
+      setFiles([]);
       if (fileInputRef.current) fileInputRef.current.value = "";
       dispatch({ type: "fail", error: result.error });
       return;
     }
-    setFile(picked as File);
+    setFiles([...picked]);
     dispatch({ type: "setFile", fileName: result.fileName });
   }
 
@@ -78,10 +90,54 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (state.step === 2 && !file) {
+    if (state.step === 2 && files.length === 0) {
       fileInputRef.current?.focus();
     }
-    dispatch({ type: "next", hasFile: file !== null });
+    dispatch({ type: "next", hasFile: files.length > 0 });
+  }
+
+  // Payment is not integrated yet: step 3 runs the real analysis directly.
+  async function runAnalysis() {
+    if (files.length === 0 || analyzing) return;
+    const category = CATEGORIES.find((value) => value === state.category);
+    const moment = MOMENTS.find((value) => value === state.moment);
+    if (!category || !moment) {
+      setAnalysisError("Completa la categoría y el momento antes de analizar.");
+      return;
+    }
+    const requestId = ++requestIdRef.current;
+    const fileSnapshot = [...files];
+    const contextSnapshot = {
+      category,
+      other: state.other,
+      amount: state.amount,
+      moment,
+      concern: state.concern,
+    };
+    setAnalyzing(true);
+    setAnalysisError(null);
+    setResult(null);
+    try {
+      const uploads = await Promise.all(fileSnapshot.map(fileToUpload));
+      const nextResult = await analyzeFiles({
+        data: {
+          files: uploads,
+          perspective: "customer",
+          context: contextSnapshot,
+        },
+      });
+      if (requestIdRef.current === requestId) setResult(nextResult);
+    } catch (err) {
+      if (requestIdRef.current === requestId) {
+        setAnalysisError(
+          err instanceof Error
+            ? err.message
+            : "No se pudo solicitar el análisis.",
+        );
+      }
+    } finally {
+      if (requestIdRef.current === requestId) setAnalyzing(false);
+    }
   }
 
   const showOther = state.category === OTHER_CATEGORY;
@@ -123,7 +179,7 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
       <div className="flow-progress">
         <i style={{ width: `${(state.step / 3) * 100}%` }} />
       </div>
-      <form onSubmit={submit}>
+      <form id="review-form" onSubmit={submit}>
         <div id="flow-content">
           {state.step === 1 && (
             <>
@@ -139,7 +195,7 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
               </p>
               <p className="privacy-note">
                 Demo interactiva: puedes recorrer el formulario sin crear una
-                cuenta. Aún no se realizan cobros ni análisis reales.
+                cuenta. Aún no se realizan cobros.
               </p>
             </>
           )}
@@ -185,7 +241,7 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => {
                   e.preventDefault();
-                  pickFile(e.dataTransfer.files[0]);
+                  pickFiles([...e.dataTransfer.files]);
                 }}
               >
                 <span className="upload-icon">↥</span>
@@ -193,19 +249,22 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
                 <span id="file-label">
                   {state.fileName ?? "Selecciona o arrastra un archivo"}
                 </span>
-                <span>PDF, JPG o PNG · máximo 10 MB</span>
+                <span>1 PDF o hasta 10 imágenes · máximo 25 MB en total</span>
                 <input
                   type="file"
+                  multiple
                   id="file"
                   ref={fileInputRef}
                   accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png"
                   aria-label="Seleccionar cotización"
-                  onChange={(e) => pickFile(e.target.files?.[0])}
+                  onChange={(e) => pickFiles([...(e.target.files ?? [])])}
                 />
               </label>
               <p className="privacy-note">
-                Puedes ocultar nombres, teléfonos, DNI/RUC y direcciones. En
-                esta demo el archivo no sale de tu dispositivo.
+                Puedes ocultar nombres, teléfonos, DNI/RUC y direcciones. El
+                archivo se envía a OpenAI para generar el reporte. CotizaLupa
+                no lo guarda en esta demo; OpenAI puede conservar datos según
+                su configuración y sus políticas.
               </p>
               <label className="field">
                 Monto aproximado en soles <small>· opcional</small>
@@ -280,11 +339,10 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
                 <b>S/39</b>
               </div>
               <div className="demo-banner">
-                <strong>Esta es una demostración.</strong>
+                <strong>El pago todavía no está habilitado.</strong>
                 <br />
-                El pago y el análisis real todavía no están habilitados. No se
-                enviará tu archivo ni se te cobrará. Puedes ver un reporte
-                ilustrativo de muebles a medida; no corresponde a tu documento.
+                Puedes correr el análisis real sin costo mientras validamos. El
+                archivo se envía a OpenAI y CotizaLupa no lo guarda en esta demo.
               </div>
               <button
                 type="button"
@@ -296,6 +354,12 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
               >
                 Ver reporte de ejemplo →
               </button>
+              {analysisError && (
+                <p className="privacy-note" role="alert">
+                  No se pudo analizar: {analysisError}
+                </p>
+              )}
+              {result && <ReportView result={result} />}
             </>
           )}
         </div>
@@ -307,24 +371,34 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
             type="button"
             className={`button outline${state.step === 1 ? " hidden" : ""}`}
             id="back"
-            onClick={() => dispatch({ type: "back" })}
+            disabled={analyzing}
+            onClick={() => {
+              setResult(null);
+              setAnalysisError(null);
+              dispatch({ type: "back" });
+            }}
           >
             Atrás
           </button>
-          <button
-            type="submit"
-            className="button blue"
-            id="next"
-            disabled={state.step === 3}
-          >
-            {state.step === 3 ? (
-              "Pago aún no disponible"
-            ) : (
-              <>
-                Continuar <span>→</span>
-              </>
-            )}
-          </button>
+          {state.step === 3 ? (
+            <button
+              type="button"
+              className="button blue"
+              id="next"
+              disabled={files.length === 0 || analyzing}
+              onClick={runAnalysis}
+            >
+              {analyzing
+                ? "Analizando…"
+                : result
+                  ? "Analizar de nuevo"
+                  : "Analizar mi cotización"}
+            </button>
+          ) : (
+            <button type="submit" className="button blue" id="next">
+              Continuar <span>→</span>
+            </button>
+          )}
         </div>
       </form>
     </dialog>

@@ -5,7 +5,6 @@ import { describe, it } from "vitest";
 describe.skip("mechanical validation", () => {
   it(">10 pages rejected", () => {});
   it("encrypted pdf rejected", () => {});
-  it("fake mime rejected", () => {});
 });
 
 describe.skip("order lifecycle", () => {

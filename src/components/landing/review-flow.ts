@@ -1,7 +1,11 @@
-// Demo review-flow state. The dialog is cliente-only (iteration 1): the role is
-// fixed, so the reducer owns step, fields, file name, and error — no role branch.
+import {
+  MAX_IMAGE_FILES,
+  MAX_ORDER_BYTES,
+  isAllowedMime,
+} from "#/lib/uploadLimits";
 
-export const MAX_FILE_BYTES = 10 * 1024 * 1024;
+// Demo review-flow state. The dialog is cliente-only (iteration 1): the role is
+// fixed, so the reducer owns step, fields, file label, and error.
 
 export interface FlowFields {
   category: string;
@@ -40,7 +44,7 @@ export const MISSING_FILE_ERROR =
   "Selecciona una cotización para recorrer la demostración.";
 
 export const INVALID_FILE_ERROR =
-  "Elige un PDF, JPG o PNG válido, no vacío y de hasta 10 MB.";
+  "Elige un PDF o hasta 10 imágenes JPG/PNG, no vacíos y de hasta 25 MB en total.";
 
 export function flowReducer(state: FlowState, action: FlowAction): FlowState {
   switch (action.type) {
@@ -73,15 +77,52 @@ interface PickedFile {
   size: number;
 }
 
+export function validatePickedFiles(
+  files: readonly PickedFile[] | null | undefined,
+): { fileName: string } | { error: string } {
+  if (!files?.length || files.length > MAX_IMAGE_FILES)
+    return { error: INVALID_FILE_ERROR };
+
+  let totalBytes = 0;
+  let pdfs = 0;
+  for (const file of files) {
+    const extensionMime = /\.pdf$/i.test(file.name)
+      ? "application/pdf"
+      : /\.jpe?g$/i.test(file.name)
+        ? "image/jpeg"
+        : /\.png$/i.test(file.name)
+          ? "image/png"
+          : null;
+    const mime = file.type === "" ? extensionMime : file.type;
+    if (
+      !extensionMime ||
+      !mime ||
+      !isAllowedMime(mime) ||
+      mime !== extensionMime
+    )
+      return { error: INVALID_FILE_ERROR };
+    if (file.size === 0) return { error: INVALID_FILE_ERROR };
+    totalBytes += file.size;
+    if (mime === "application/pdf") pdfs += 1;
+  }
+
+  if (
+    totalBytes > MAX_ORDER_BYTES ||
+    pdfs > 1 ||
+    (pdfs === 1 && files.length > 1)
+  )
+    return { error: INVALID_FILE_ERROR };
+
+  return {
+    fileName:
+      files.length === 1
+        ? files[0]!.name
+        : `${files.length} imágenes seleccionadas`,
+  };
+}
+
 export function validatePickedFile(
   file: PickedFile | null | undefined,
 ): { fileName: string } | { error: string } {
-  if (!file) return { error: INVALID_FILE_ERROR };
-  const goodExt = /\.(pdf|jpe?g|png)$/i.test(file.name);
-  const goodMime = ["application/pdf", "image/jpeg", "image/png", ""].includes(
-    file.type,
-  );
-  if (!goodExt || !goodMime || file.size > MAX_FILE_BYTES || file.size === 0)
-    return { error: INVALID_FILE_ERROR };
-  return { fileName: file.name };
+  return validatePickedFiles(file ? [file] : file);
 }

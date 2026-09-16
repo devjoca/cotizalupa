@@ -6,6 +6,7 @@ import {
   flowReducer,
   initialFlowState,
   validatePickedFile,
+  validatePickedFiles,
 } from "../src/components/landing/review-flow";
 
 describe("review flow", () => {
@@ -77,10 +78,10 @@ describe("review flow", () => {
 });
 
 describe("validatePickedFile", () => {
-  it("accepts pdf, jpg, and png within 10 MB", () => {
+  it("accepts pdf, jpg, and png within 25 MB", () => {
     for (const file of [
       { name: "coti.pdf", type: "application/pdf", size: 1024 },
-      { name: "foto.JPG", type: "image/jpeg", size: 10 * 1024 * 1024 },
+      { name: "foto.JPG", type: "image/jpeg", size: 25 * 1024 * 1024 },
       { name: "captura.png", type: "", size: 512 },
     ]) {
       expect(validatePickedFile(file)).toEqual({ fileName: file.name });
@@ -91,11 +92,37 @@ describe("validatePickedFile", () => {
     for (const file of [
       { name: "coti.exe", type: "", size: 1024 },
       { name: "coti.pdf", type: "text/plain", size: 1024 },
-      { name: "coti.pdf", type: "application/pdf", size: 10 * 1024 * 1024 + 1 },
+      { name: "coti.pdf", type: "application/pdf", size: 25 * 1024 * 1024 + 1 },
       { name: "coti.pdf", type: "application/pdf", size: 0 },
       null,
     ]) {
       expect(validatePickedFile(file)).toEqual({ error: INVALID_FILE_ERROR });
     }
+  });
+
+  it("accepts up to ten images within the combined limit", () => {
+    const files = Array.from({ length: 10 }, (_, index) => ({
+      name: `foto-${index}.jpg`,
+      type: "image/jpeg",
+      size: 2 * 1024 * 1024,
+    }));
+    expect(validatePickedFiles(files)).toEqual({
+      fileName: "10 imágenes seleccionadas",
+    });
+  });
+
+  it("rejects mixed PDF/image uploads and a combined oversize", () => {
+    expect(
+      validatePickedFiles([
+        { name: "coti.pdf", type: "application/pdf", size: 1024 },
+        { name: "foto.jpg", type: "image/jpeg", size: 1024 },
+      ]),
+    ).toEqual({ error: INVALID_FILE_ERROR });
+    expect(
+      validatePickedFiles([
+        { name: "uno.jpg", type: "image/jpeg", size: 13 * 1024 * 1024 },
+        { name: "dos.jpg", type: "image/jpeg", size: 13 * 1024 * 1024 },
+      ]),
+    ).toEqual({ error: INVALID_FILE_ERROR });
   });
 });

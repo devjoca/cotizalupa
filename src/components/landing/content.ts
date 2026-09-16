@@ -129,27 +129,3 @@ export const CLIENT_EXAMPLE: ClientExampleReport = {
     "¿Qué garantía ofrecen y por cuánto tiempo? Si hay un error de fabricación o medidas, ¿quién asume la corrección y la reinstalación?",
   ],
 };
-
-export const CATEGORIES = [
-  "Muebles a medida",
-  "Remodelación",
-  "Construcción",
-  "Catering y eventos",
-  "Fotografía",
-  "Diseño gráfico",
-  "Arquitectura",
-  "Marketing",
-  "Desarrollo web",
-  "Desarrollo de software",
-  "Servicios profesionales",
-  "Reparaciones e instalaciones",
-  "Otro",
-];
-
-export const MOMENTS = [
-  "Estoy por aceptar o pagar un adelanto",
-  "Ya acepté, pero todavía no pagué",
-  "Ya pagué un adelanto o el total",
-];
-
-export const OTHER_CATEGORY = "Otro";

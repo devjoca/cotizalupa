@@ -112,17 +112,27 @@ not bake `payloadHttp` / `code === "00"` / Yape into order logic.
 PLAN.md is not rewritten. Economics and the Paddle email live in
 `docs/pricing.md`.
 
-### D9 — Pre-check removed; single AI pass; payment deferred (2026-09-16)
-v1 runs submit → result with no payment and no pre-payment gate (Joca's call:
-watch user behavior once money moves, re-add a cheap gate only if refund pain
-justifies it). Mechanical validation is the only pre-analysis rejection; the
-one-quotation-only check folds into the single Astra analysis pass, violations
-→ `NOT_ANALYZABLE` + eval case. Deleted `src/server/precheck.ts` and
-`PrecheckSchema` outright — no just-in-case code. Report + facts schemas return
-with the AI adapter (`src/server/ai.ts`, thin wrapper owning `store: false` +
-strict schema + Zod). Open risk: the in-memory rate limit lived in the deleted
-pre-check, so Astra spend is currently ungated — it needs a home before any
-public deploy.
+### D9 — Free POC uses one AI pass; payment remains blocked (2026-09-16)
+The free POC runs submit → result with no payment and no AI pre-payment gate.
+The backend still rejects mechanically invalid uploads before model spend: one
+PDF of at most 10 pages, or 1–10 JPG/PNG images, 25 MiB combined, real MIME,
+readable/unencrypted PDF, server-computed SHA-256. The single Astra pass checks
+the commercial unit and produces the report. This is not the paid design: a
+cheap pre-check must return before checkout so we never charge for an illegible,
+non-quotation, or multi-quotation document.
+
+The POC model boundary lives in `src/server/ai.ts`: `store: false`, 16,000 total
+output/reasoning tokens, a 180 s timeout, one retry, strict JSON schema, and a
+second domain-validation pass. PDFs use `input_file`; photos use `input_image`.
+User context is normalized, length-limited, passed as untrusted data, and never
+overrides document facts. `quotation_facts` is canonical; the report header is
+derived from it instead of asking the model for duplicate quotation fields.
+Model invalid output, refusal, document rejection, retryable provider failure,
+and permanent provider/configuration failure remain distinct outcomes.
+
+Spend protection stays in memory to preserve the one-process design: 10
+requests per IP per hour and at most two simultaneous model calls. These limits
+reset on deploy and are intentionally not distributed.
 
 ## Phase status
 
