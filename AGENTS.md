@@ -248,12 +248,11 @@ saves report + facts, and marks `COMPLETED`. One sweep deletes originals past
 
 - `src/routes/` — TanStack Start routes: landing/upload flow, `/r/$token` report page.
 - `src/server/validation.ts` — mechanical validation (MIME, size, pages, sha256).
-- `src/server/precheck.ts` — cheap-model gate + in-memory IP rate limit.
 - `src/server/payments.ts` — payment adapter (Paddle first): session, webhook, idempotency.
 - `src/server/process.ts` — `processNext()`, claim query, Astra analysis, retries.
 - `src/server/storage.ts` — bucket presigned URLs, immutability, deletion sweep.
 - `src/db/` — Drizzle schema + `pg` Pool client (`schema.ts`, `client.ts`).
-- `src/lib/schemas.ts` — `PrecheckSchema`, report schemas (Zod 4, strict).
+- `src/lib/schemas.ts` — report + `quotation_facts` schemas (Zod 4, strict).
 - `ops/queries.sql` — hand-run operational queries (no admin UI).
 - `tests/` — `pnpm test`: deterministic Vitest suite, runs in CI.
 - `eval/` + `fixtures/` — `pnpm eval`: hand-run model evals, costs money.

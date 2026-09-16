@@ -9,7 +9,6 @@ describe.skip("mechanical validation", () => {
 });
 
 describe.skip("order lifecycle", () => {
-  it("payment cannot occur before successful precheck", () => {});
   it("files immutable after PAYMENT_PENDING", () => {});
   it("terminal states set delete_after", () => {});
 });

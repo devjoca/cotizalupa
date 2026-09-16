@@ -103,10 +103,22 @@ not bake `payloadHttp` / `code === "00"` / Yape into order logic.
 PLAN.md is not rewritten. Economics and the Paddle email live in
 `docs/pricing.md`.
 
+### D9 — Pre-check removed; single AI pass; payment deferred (2026-09-16)
+v1 runs submit → result with no payment and no pre-payment gate (Joca's call:
+watch user behavior once money moves, re-add a cheap gate only if refund pain
+justifies it). Mechanical validation is the only pre-analysis rejection; the
+one-quotation-only check folds into the single Astra analysis pass, violations
+→ `NOT_ANALYZABLE` + eval case. Deleted `src/server/precheck.ts` and
+`PrecheckSchema` outright — no just-in-case code. Report + facts schemas return
+with the AI adapter (`src/server/ai.ts`, thin wrapper owning `store: false` +
+strict schema + Zod). Open risk: the in-memory rate limit lived in the deleted
+pre-check, so Astra spend is currently ungated — it needs a home before any
+public deploy.
+
 ## Phase status
 
 - [x] 0. Scaffold (this file's baseline)
-- [ ] 1. Core: Neon/Drizzle live, bucket, upload, mechanical validation, orders, pre-check
+- [ ] 1. Core: Neon/Drizzle live, bucket, upload, mechanical validation, orders
 - [ ] 2. Producto: Astra → Zod → report, `quotation_facts`, `processNext()`, `/r/{token}`
 - [ ] 3. Money: payment adapter (Paddle first, pending written yes), idempotency, webhooks. Meta CAPI needed (Purchase on `PAID` only) — acquisition is ads (D7, D8)
 - [ ] 4. Producción: `delete_after` sweep, retries, privacy policy, real-money test + refund path

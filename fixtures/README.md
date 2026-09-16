@@ -12,4 +12,4 @@ Drop the 8 PDFs from PLAN.md "Tests" here:
 - ten-page-quotation.pdf
 
 The eval runner prints hits over total. Guideline 9/10, not a strict pass/fail.
-// TODO: phase 2 — eval/precheck.eval.ts + eval/analysis.eval.ts
+// TODO: phase 2 — eval/analysis.eval.ts
