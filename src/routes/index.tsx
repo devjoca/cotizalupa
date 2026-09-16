@@ -12,7 +12,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Descubre qué falta aclarar en una cotización antes de aceptarla o enviarla. Una revisión, dos perspectivas. S/20, sin suscripción.",
+          "Descubre qué falta aclarar en una cotización antes de aceptarla. Revisión para clientes. S/39, sin suscripción.",
       },
       { name: "theme-color", content: "#b33127" },
     ],

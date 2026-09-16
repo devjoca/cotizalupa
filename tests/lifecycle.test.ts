@@ -14,10 +14,10 @@ describe.skip("order lifecycle", () => {
   it("terminal states set delete_after", () => {});
 });
 
-describe.skip("payments (Izipay)", () => {
-  it("IPN with bad signature rejected", () => {});
-  it("IPN with wrong amount rejected", () => {});
-  it("duplicate IPN doesn't duplicate report", () => {});
+describe.skip("payments", () => {
+  it("webhook with bad signature rejected", () => {});
+  it("webhook with wrong amount rejected", () => {});
+  it("duplicate webhook doesn't duplicate report", () => {});
 });
 
 describe.skip("processing", () => {

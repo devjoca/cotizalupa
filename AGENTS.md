@@ -89,9 +89,10 @@ Use this language when communicating:
 
 ## The three ways to hurt yourself
 
-1. **Touching real money.** Izipay sandbox and production look alike. Never run a
-   real charge, real refund, or production IPN replay to "verify". Verify payments
-   with the sandbox and the idempotency tests. A duplicate charge is worse than a bug.
+1. **Touching real money.** Sandbox and production look alike. Never run a
+   real charge, real refund, or production webhook replay to "verify". Verify
+   payments with the sandbox and the idempotency tests. A duplicate charge is
+   worse than a bug.
 2. **Reading or keeping secrets and documents.** Never open `.env`, `.env.*`, or any
    credentials/keys/token files — yours or any subagent's. Never log, copy, or
    persist original quotation content, billing, or card data. `payment_events.payload`
@@ -137,8 +138,8 @@ order-flow work done, walk this list and say which entries applied:
 - Files go to the Railway Private Bucket via presigned URLs. No local-disk uploads
   path that bypasses validation.
 - A 60 s `setInterval` calls `processNext()` for stuck orders and expired deletes.
-  The IPN handler calls it too after responding 200. Stop what you started: kill
-  only PIDs you spawned.
+  The payment webhook handler calls it too after responding 200. Stop what you
+  started: kill only PIDs you spawned.
 - Never commit or publish `.env`, tokens, sandbox credentials, or report URLs.
 
 ## Test data
@@ -173,16 +174,22 @@ Real quotations are the most sensitive data we hold. Treat them accordingly:
 
 ## Payments
 
+The provider is an adapter (`src/server/payments.ts`). Order states do not
+change with the brand. MVP rail is **Paddle** (D8), pending written product
+acceptance. Izipay is the deferred local rail — do not encode its payload
+shape in order logic.
+
 Money code has one extra reviewer: the ledger. Every payments change must show:
 
-- Signature verified over `payloadHttp`, `code === "00"`, matching `orderNumber`,
-  amount in cents, and currency before any state change.
-- `uniqueId` UNIQUE in `payment_events`: duplicates answer 200 and stop.
+- Event authenticated, success, matching order id, amount, and currency before
+  any state change. (Paddle: their signature + `transaction_id`. Izipay, if we
+  switch: `payloadHttp`, `code === "00"`, `orderNumber`.)
+- `payment_events.provider_event_id` UNIQUE: duplicates answer 200 and stop.
 - Conditional transition (`PAID` only from `PAYMENT_PENDING`, zero rows = no-op).
-- IPN and browser callback entering through the same path — tested, not asserted.
+- Webhook and browser return entering through the same path — tested, not asserted.
 - No new persisted PII. DNI, address, card, and billing never touch the database.
 
-Refunds are manual from the Izipay panel, then `UPDATE orders SET status='REFUNDED'`.
+Refunds: provider dashboard (or their API), then `UPDATE orders SET status='REFUNDED'`.
 There is no auto-refund code path in the MVP.
 
 ## Commits and PRs
@@ -225,24 +232,24 @@ Most code changes do not need a documentation change. Agents can read the code.
 
 ```
 CREATE ORDER → UPLOAD → MECHANICAL VALIDATION → PRE-CHECK IA → READY_FOR_PAYMENT
-→ IZIPAY → PAID → CLAIM → ASTRA ANALYSIS → ZOD → SAVE REPORT + FACTS
+→ CHECKOUT (Paddle MVP) → PAID → CLAIM → ASTRA ANALYSIS → ZOD → SAVE REPORT + FACTS
 → COMPLETED → DELETE ORIGINAL ≤ 24 h
 ```
 
 Clients upload to presigned URLs. The server validates mechanically (`file-type`,
 `unpdf`, 25 MB, 10 pages/images, server-computed `sha256`), runs the cheap-model
-pre-check, and only then opens Izipay checkout. After idempotent payment
-confirmation, `processNext()` claims the order (`FOR UPDATE SKIP LOCKED`), calls
-Astra with `store: false` and strict `json_schema`, validates with Zod as a second
-barrier, saves report + facts, and marks `COMPLETED`. One sweep deletes originals
-past `delete_after`.
+pre-check, and only then opens checkout. After idempotent payment confirmation,
+`processNext()` claims the order (`FOR UPDATE SKIP LOCKED`), calls Astra with
+`store: false` and strict `json_schema`, validates with Zod as a second barrier,
+saves report + facts, and marks `COMPLETED`. One sweep deletes originals past
+`delete_after`.
 
 ## Where code lives
 
 - `src/routes/` — TanStack Start routes: landing/upload flow, `/r/$token` report page.
 - `src/server/validation.ts` — mechanical validation (MIME, size, pages, sha256).
 - `src/server/precheck.ts` — cheap-model gate + in-memory IP rate limit.
-- `src/server/payments.ts` — Izipay session, IPN/callback, idempotency.
+- `src/server/payments.ts` — payment adapter (Paddle first): session, webhook, idempotency.
 - `src/server/process.ts` — `processNext()`, claim query, Astra analysis, retries.
 - `src/server/storage.ts` — bucket presigned URLs, immutability, deletion sweep.
 - `src/db/` — Drizzle schema + `pg` Pool client (`schema.ts`, `client.ts`).
@@ -251,11 +258,12 @@ past `delete_after`.
 - `tests/` — `pnpm test`: deterministic Vitest suite, runs in CI.
 - `eval/` + `fixtures/` — `pnpm eval`: hand-run model evals, costs money.
 - `docs/mockup/` — static landing/flow reference (read-only, do not ship as-is).
+- `docs/pricing.md` — ticket (S/39 / ~$12), rail (Paddle first), unit economics. Change number or rail here and in D7/D8 together.
 - `drizzle/` — generated migrations (`pnpm db:generate`, `pnpm db:migrate`).
 
 ## Taste
 
-- Complexity belongs at the adapter boundary (Izipay, OpenAI, bucket). Order logic
+- Complexity belongs at the adapter boundary (payments, OpenAI, bucket). Order logic
   stays plain: status values in the DB plus conditional updates, no state-machine library.
 - No speculative gaps: 0–3 strong gaps beat 8 invented ones. Unknown fields are
   `null`, never inferred. The prompt rule and Zod both enforce this.
@@ -270,5 +278,6 @@ past `delete_after`.
 - Do not verify with browsers or computer use unless explicitly agreed or requested.
 - Security matters most at three seams: payment verification, report-token lookup,
   and file deletion. Elsewhere, prefer simplicity over hardening.
-- The four Izipay questions (IPN retries, query API, refund API, minimum billing
-  fields) go out before phase 1 — flag anything that answers them sooner.
+- Paddle product-acceptance questions go out before writing the adapter
+  (`docs/pricing.md`). Izipay questions only if we switch. Flag anything that
+  answers either sooner.

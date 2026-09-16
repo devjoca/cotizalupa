@@ -1,4 +1,4 @@
-// Single process. IPN handler calls processNext() after responding 200.
+// Single process. Payment webhook handler calls processNext() after responding 200.
 // A 60s setInterval also calls processNext() (stuck orders + expired deletes).
 // Claim query with FOR UPDATE SKIP LOCKED; after 3 attempts → PROCESSING_FAILED.
 // Analysis: Responses API, store:false, strict json_schema, Zod as second barrier.

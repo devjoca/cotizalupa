@@ -78,15 +78,49 @@ multi-step work, walkthrough reports, findings-reported-not-fixed unless
 trivial, EN inside / es-PE outside, tests mandatory only for money + states +
 idempotency + immutability, commits only on explicit ask.
 
+### D7 — Ticket is S/39 PEN / ~$12, one-shot (2026-09-15)
+Mockup and early copy said S/20. That covers inference + a cheap gateway
+and then loses money once Meta Ads is the acquisition channel. S/39 is
+the launch willingness-to-pay (~$12 at 3.40). Live landing shows S/39.
+`docs/mockup/` stays S/20 as the visual baseline — do not "fix" it. Meta
+CAPI is needed (Purchase only on `PAID`). Do not change the ticket in
+code without updating this decision and `docs/pricing.md`.
+
+### D8 — Paddle first; Izipay is an adapter, not the product (2026-09-15)
+MVP hypothesis is “will someone pay ~$12?”, not “can we operate Peruvian
+payments.” Pending written product acceptance, checkout is Paddle (MoR):
+pre-check → Paddle → webhook `PAID` → analyze. We still have renta and
+the monthly 621; we do not emit a boleta per consumer in this path.
+Exportación de servicios and IGV on a non-domiciled MoR fee are
+accountant questions, not assumptions.
+
+Izipay (PLAN’s rail) is deferred. Switch back when people pay and we
+optimize Peru, or when no-Yape kills Purchase conversion. Payments code
+must stay provider-agnostic: verify event, match order/amount/currency,
+idempotent `provider_event_id`, `PAID` only from `PAYMENT_PENDING`. Do
+not bake `payloadHttp` / `code === "00"` / Yape into order logic.
+
+PLAN.md is not rewritten. Economics and the Paddle email live in
+`docs/pricing.md`.
+
 ## Phase status
 
 - [x] 0. Scaffold (this file's baseline)
 - [ ] 1. Core: Neon/Drizzle live, bucket, upload, mechanical validation, orders, pre-check
 - [ ] 2. Producto: Astra → Zod → report, `quotation_facts`, `processNext()`, `/r/{token}`
-- [ ] 3. Money: Izipay sandbox, idempotency, Yape + card, callbacks
-- [ ] 4. Producción: `delete_after` sweep, retries, privacy policy, manual boleta, real-money test + manual refund
+- [ ] 3. Money: payment adapter (Paddle first, pending written yes), idempotency, webhooks. Meta CAPI needed (Purchase on `PAID` only) — acquisition is ads (D7, D8)
+- [ ] 4. Producción: `delete_after` sweep, retries, privacy policy, real-money test + refund path
 
-## Open questions (carried from PLAN)
+## Open questions
 
-Izipay, before phase 1: IPN retries, query API, refund API, minimum billing
-fields. Flag anything that answers them sooner.
+Paddle, before writing `payments.ts`: product accepted? one-shot USD?
+signed webhook + retries + stable event id? checkout only after pre-check?
+refunds? invoice language + LATAM VAT/IGV? Peru-resident payouts? ToS
+vs AI/document-upload.
+
+Accountant, before first live charge: CotizaLupa→Paddle booking;
+exportación de servicios (four SUNAT conditions, do not assume);
+non-domiciled IGV on the MoR fee (2026 procedure).
+
+Izipay only if we switch: IPN retries, query API, refund API, minimum
+billing fields, tarifario, Yape vs card, 24 h expiry.
