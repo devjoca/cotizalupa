@@ -18,8 +18,10 @@ pnpm dev
 
 `dev:infra` starts PostgreSQL on `127.0.0.1:55432` and MinIO on
 `127.0.0.1:59000` (console: `127.0.0.1:59001`). The example environment file
-already contains the matching local-only credentials. Add an OpenAI key only
-when the flow being tested needs a model call.
+already contains the matching local-only credentials. In development, the app
+uses that PostgreSQL URL when `DATABASE_URL` is absent. Set `DATABASE_URL` only
+to override the local database. Add an OpenAI key only when the flow being
+tested needs a model call. Production still requires `DATABASE_URL`.
 
 DB-backed tests use generated databases under `cotizalupa_test`; they never use
 `DATABASE_URL`:

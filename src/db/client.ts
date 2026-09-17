@@ -9,6 +9,19 @@ import * as schema from "./schema";
 
 type PgPool = InstanceType<typeof Pool>;
 
+const LOCAL_DATABASE_URL =
+  "postgresql://cotizalupa:cotizalupa@127.0.0.1:55432/cotizalupa";
+
+export function resolveDatabaseUrl(
+  env: Pick<NodeJS.ProcessEnv, "DATABASE_URL" | "NODE_ENV"> = process.env,
+): string {
+  if (env.DATABASE_URL) return env.DATABASE_URL;
+  if (env.NODE_ENV === "production") {
+    throw new Error("DATABASE_URL is required");
+  }
+  return LOCAL_DATABASE_URL;
+}
+
 // Production, local development, and tests all use the same `pg` driver.
 export type Db = NodePgDatabase<typeof schema>;
 
@@ -16,8 +29,7 @@ let pool: PgPool | undefined;
 let db: Db | undefined;
 
 export function getPool(): PgPool {
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) throw new Error("DATABASE_URL is required");
+  const connectionString = resolveDatabaseUrl();
   pool ??= new Pool({ connectionString });
   return pool;
 }
