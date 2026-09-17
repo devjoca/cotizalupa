@@ -199,3 +199,66 @@
     padding: 22px;
   }
 }
+
+@media print {
+  .report-document {
+    overflow: visible;
+    border: 0;
+    box-shadow: none;
+    font-size: 10.5pt;
+  }
+
+  .report-document__head {
+    padding: 0 0 18pt;
+    break-after: avoid;
+  }
+
+  .report-document__title {
+    padding: 24pt 0 14pt;
+    break-after: avoid;
+  }
+
+  .report-document__title h1 {
+    font-size: 34pt;
+  }
+
+  .report-priorities {
+    margin: 12pt 0 22pt;
+    padding: 16pt 18pt;
+    break-inside: avoid;
+  }
+
+  .report-block {
+    padding: 22pt 0;
+  }
+
+  .report-block h2 {
+    break-after: avoid-page;
+  }
+
+  .report-findings {
+    display: block;
+  }
+
+  .report-finding,
+  .report-document .copy-box {
+    break-inside: avoid-page;
+  }
+
+  .report-finding + .report-finding {
+    margin-top: 22pt;
+  }
+
+  .report-finding blockquote {
+    font-size: 14pt;
+  }
+
+  .report-document .copy-box button {
+    display: none;
+  }
+
+  .report-document__foot {
+    padding: 14pt 0 0;
+    border-top: 1px solid var(--report-line);
+  }
+}

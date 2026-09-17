@@ -72,16 +72,35 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
     if (dialogRef.current) dialogRef.current.scrollTop = 0;
   }, [open, state.step]);
 
-  function pickFiles(picked: readonly File[]) {
-    const result = validatePickedFiles(picked);
+  function addFiles(picked: readonly File[]) {
+    const replacingPdf =
+      files.length === 1 &&
+      /\.pdf$/i.test(files[0]!.name) &&
+      picked.length === 1 &&
+      /\.pdf$/i.test(picked[0]!.name);
+    const nextFiles = replacingPdf ? [...picked] : [...files, ...picked];
+    const result = validatePickedFiles(nextFiles);
+    if (fileInputRef.current) fileInputRef.current.value = "";
     if ("error" in result) {
-      setFiles([]);
-      if (fileInputRef.current) fileInputRef.current.value = "";
       dispatch({ type: "fail", error: result.error });
       return;
     }
-    setFiles([...picked]);
+    setFiles(nextFiles);
     dispatch({ type: "setFile", fileName: result.fileName });
+  }
+
+  function removeFile(indexToRemove: number) {
+    const nextFiles = files.filter((_, index) => index !== indexToRemove);
+    setFiles(nextFiles);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (nextFiles.length === 0) {
+      dispatch({ type: "setFile", fileName: null });
+      return;
+    }
+    const result = validatePickedFiles(nextFiles);
+    if ("fileName" in result) {
+      dispatch({ type: "setFile", fileName: result.fileName });
+    }
   }
 
   function update(field: keyof FlowFields, value: string) {
@@ -155,6 +174,19 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
   }
 
   const showOther = state.category === OTHER_CATEGORY;
+  const hasPdf = files.length === 1 && /\.pdf$/i.test(files[0]!.name);
+  const uploadTitle =
+    files.length === 0
+      ? "Sube tu cotización"
+      : hasPdf
+        ? "Cambia el PDF"
+        : "Agrega otra imagen";
+  const uploadPrompt =
+    files.length === 0
+      ? "Selecciona o arrastra un archivo"
+      : hasPdf
+        ? "Selecciona o arrastra otro PDF"
+        : "Selecciona o arrastra más imágenes";
 
   return (
     <dialog
@@ -255,14 +287,12 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => {
                   e.preventDefault();
-                  pickFiles([...e.dataTransfer.files]);
+                  addFiles([...e.dataTransfer.files]);
                 }}
               >
                 <span className="upload-icon">↥</span>
-                <strong>Sube tu cotización</strong>
-                <span id="file-label">
-                  {state.fileName ?? "Selecciona o arrastra un archivo"}
-                </span>
+                <strong>{uploadTitle}</strong>
+                <span id="file-label">{uploadPrompt}</span>
                 <span>1 PDF o hasta 10 imágenes · máximo 25 MB en total</span>
                 <input
                   type="file"
@@ -271,9 +301,36 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
                   ref={fileInputRef}
                   accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png"
                   aria-label="Seleccionar cotización"
-                  onChange={(e) => pickFiles([...(e.target.files ?? [])])}
+                  onChange={(e) => addFiles([...(e.target.files ?? [])])}
                 />
               </label>
+              {files.length > 0 && (
+                <div className="selected-files" aria-live="polite">
+                  <div className="selected-files-head">
+                    <strong>
+                      {files.length === 1
+                        ? "Archivo seleccionado"
+                        : `${files.length} archivos seleccionados`}
+                    </strong>
+                  </div>
+                  <ul>
+                    {files.map((file, index) => (
+                      <li
+                        key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
+                      >
+                        <span>{file.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeFile(index)}
+                          aria-label={`Quitar ${file.name}`}
+                        >
+                          Quitar
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               <p className="privacy-note">
                 Puedes ocultar nombres, teléfonos, DNI/RUC y direcciones. El
                 archivo se usa solo para generar el reporte y CotizaLupa no lo

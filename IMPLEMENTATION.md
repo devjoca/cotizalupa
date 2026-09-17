@@ -169,8 +169,10 @@ attempt. Bucket reads verify size and SHA-256 before analysis; deletion marks
 `/r/{token}` hashes the raw URL token on the server, validates the stored report
 against `AnalysisSchema`, and renders only persisted report data. Invalid,
 unfinished, and unavailable reports have separate es-PE states. The page is
-`noindex`, contains no Meta pixel, and never stores the raw token. Email capture,
-email delivery, and PDF download remain undecided and are not part of this phase.
+`noindex`, contains no Meta pixel, and never stores the raw token. Completed
+reports offer browser print-to-PDF with a dedicated A4 stylesheet; we do not
+generate or store another report artifact. Email capture and delivery remain
+undecided and are not part of this phase.
 
 ## Phase status
 

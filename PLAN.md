@@ -260,8 +260,10 @@ Campo desconocido: `null`. Nunca inventado.
 ## Página del reporte
 
 `/r/{token}`. Se busca por `sha256(token)` y solo renderiza el reporte persistido.
-Sin pixel de Meta en esta página. El envío por email, la captura de email y la
-descarga en PDF quedan diferidos hasta definir ese flujo de producto.
+Sin pixel de Meta en esta página. El usuario puede guardarlo como PDF mediante
+la impresión del navegador, con estilos de impresión propios y sin persistir
+otra copia. El envío y la captura de email quedan diferidos hasta definir ese
+flujo de producto.
 
 ## Privacidad
 

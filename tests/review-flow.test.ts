@@ -104,6 +104,28 @@ describe("review flow", () => {
     expect(state.fileName).toBeNull();
     expect(state.error).toBe(INVALID_FILE_ERROR);
   });
+
+  it("keeps an existing file when a new selection is invalid", () => {
+    const state = flowReducer(
+      {
+        ...initialFlowState,
+        step: 2,
+        fileName: "cotizacion.pdf",
+      },
+      { type: "fail", error: INVALID_FILE_ERROR },
+    );
+    expect(state.fileName).toBe("cotizacion.pdf");
+    expect(state.error).toBe(INVALID_FILE_ERROR);
+  });
+
+  it("clears the file label after the last file is removed", () => {
+    const state = flowReducer(
+      { ...initialFlowState, step: 2, fileName: "cotizacion.pdf" },
+      { type: "setFile", fileName: null },
+    );
+    expect(state.fileName).toBeNull();
+    expect(state.error).toBeNull();
+  });
 });
 
 describe("validatePickedFile", () => {

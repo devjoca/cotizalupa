@@ -36,7 +36,7 @@ export const initialFlowState: FlowState = {
 export type FlowAction =
   | { type: "open" }
   | { type: "update"; field: keyof FlowFields; value: string }
-  | { type: "setFile"; fileName: string }
+  | { type: "setFile"; fileName: string | null }
   | { type: "fail"; error: string }
   | { type: "next"; hasFile: boolean }
   | { type: "back" };
@@ -80,7 +80,7 @@ export function flowReducer(state: FlowState, action: FlowAction): FlowState {
     case "setFile":
       return { ...state, fileName: action.fileName, error: null };
     case "fail":
-      return { ...state, fileName: null, error: action.error };
+      return { ...state, error: action.error };
     case "back":
       return state.step > 1
         ? { ...state, step: (state.step - 1) as 1 | 2, error: null }

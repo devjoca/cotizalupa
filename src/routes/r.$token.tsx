@@ -32,6 +32,12 @@ function ReportPage() {
   if (result.status === "COMPLETED") {
     return (
       <main className="report-page">
+        <nav className="report-nav" aria-label="Navegación del reporte">
+          <a href="/">← Volver al inicio</a>
+          <button type="button" onClick={() => window.print()}>
+            Guardar como PDF
+          </button>
+        </nav>
         <ReportDocument analysis={result.analysis} />
       </main>
     );
