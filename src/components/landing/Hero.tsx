@@ -142,25 +142,20 @@ export function Hero({ onStart }: { onStart: () => void }) {
           </span>
         </h1>
         <p className="hero-description">
-          Descubre qué falta dejar claro en una cotización{" "}
-          <strong>antes de aceptarla.</strong>
-        </p>
-        <p className="hero-detail">
-          Plazos, materiales, extras y responsabilidades. Te ayudamos a hacer
-          las preguntas que faltan.
+          Sube tu cotización y descubre qué falta aclarar{" "}
+          <strong>antes de aceptar o pagar.</strong>
         </p>
         <div className="hero-actions">
           <button className="button blue" onClick={onStart}>
             Revisar mi cotización <span aria-hidden="true">↗</span>
           </button>
           <div className="price-inline">
-            <strong>S/39</strong>
-            <span>por revisión · pago único</span>
+            <strong>$12 USD</strong>
+            <span>precio de lanzamiento · pago único</span>
           </div>
         </div>
         <div className="micro-trust">
-          Sin cuenta <span>·</span> Sin suscripción <span>·</span> PDF, foto o
-          captura
+          Sin cuenta <span>·</span> PDF, foto o captura
         </div>
       </div>
       <HeroRotator />

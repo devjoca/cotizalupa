@@ -260,7 +260,7 @@ saves report + facts, and marks `COMPLETED`. One sweep deletes originals past
 - `tests/` — `pnpm test`: deterministic Vitest suite, runs in CI.
 - `eval/` + `fixtures/` — `pnpm eval`: hand-run model evals, costs money.
 - `docs/mockup/` — static landing/flow reference (read-only, do not ship as-is).
-- `docs/pricing.md` — ticket (S/39 / ~$12), rail (Paddle first), unit economics. Change number or rail here and in D7/D8 together.
+- `docs/pricing.md` — ticket ($12 USD), rail (Paddle first), unit economics. Change number or rail here and in D7/D8 together.
 - `drizzle/` — generated migrations (`pnpm db:generate`, `pnpm db:migrate`).
 
 ## Taste

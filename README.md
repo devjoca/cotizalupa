@@ -42,3 +42,9 @@ The deployed app is one persistent Railway service. Configure a Neon
 `DATABASE_URL`, Railway private-bucket S3 variables, `OPENAI_API_KEY`, and the
 optional server-only `SENTRY_DSN` from `.env.example`. Do not reuse production
 resources for development or tests.
+
+To pause free reviews on a deployed service, set `REVIEWS_DISABLED=true` in
+Railway's deployment environment and restart the service. Only the exact value
+`true` pauses the final submit and server analysis endpoint. Unset or `false`
+keeps the free POC available and does not enable payments. The internal
+`/analyze` page and its separate analysis endpoint have been removed.

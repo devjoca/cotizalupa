@@ -91,17 +91,19 @@ multi-step work, walkthrough reports, findings-reported-not-fixed unless
 trivial, EN inside / es-PE outside, tests mandatory only for money + states +
 idempotency + immutability, commits only on explicit ask.
 
-### D7 — Ticket is S/39 PEN / ~$12, one-shot (2026-09-15)
+### D7 — Ticket is $12 USD, one-shot (2026-09-15, display updated 2026-09-17)
 Mockup and early copy said S/20. That covers inference + a cheap gateway
-and then loses money once Meta Ads is the acquisition channel. S/39 is
-the launch willingness-to-pay (~$12 at 3.40). Live landing shows S/39.
+and then loses money once Meta Ads is the acquisition channel. $12 USD is
+the launch willingness-to-pay (about S/39 at 3.40, reference only). Live landing shows $12 USD.
 `docs/mockup/` stays S/20 as the visual baseline — do not "fix" it. Meta
 CAPI is needed (Purchase only on `PAID`). Do not change the ticket in
 code without updating this decision and `docs/pricing.md`.
 
-### D8 — Paddle is the MVP payment rail (2026-09-15, updated 2026-09-16)
+### D8 — Paddle is the MVP payment rail (2026-09-15, updated 2026-09-17)
 MVP hypothesis is “will someone pay ~$12?”, not “can we operate Peruvian
-payments.” Pending written product acceptance, checkout is Paddle (MoR):
+payments.” Paddle does not provide preliminary assessments or preapproval by
+email. Eligibility is pending the Paddle application, a live HTTPS domain, and
+review of the functional product. Once accepted, checkout is Paddle (MoR):
 pre-check → Paddle → webhook `PAID` → analyze. We still have renta and
 the monthly 621; we do not emit a boleta per consumer in this path.
 Exportación de servicios and IGV on a non-domiciled MoR fee are
@@ -109,7 +111,7 @@ accountant questions, not assumptions.
 
 Payments code stays provider-agnostic: verify the Paddle event, match
 order/amount/currency, deduplicate `provider_event_id`, and allow `PAID` only
-from `PAYMENT_PENDING`. Economics and the acceptance email live in
+from `PAYMENT_PENDING`. Economics and the Paddle application questions live in
 `docs/pricing.md`.
 
 ### D9 — Free POC uses one AI pass; payment remains blocked (2026-09-16)
@@ -174,6 +176,24 @@ reports offer browser print-to-PDF with a dedicated A4 stylesheet; we do not
 generate or store another report artifact. Email capture and delivery remain
 undecided and are not part of this phase.
 
+### D13 — Review shutdown flag (2026-09-17)
+
+Phase 2 includes the server-only `REVIEWS_DISABLED` flag. Only the exact value
+`true` disables the free review flow: the final submit is disabled in the UI,
+and the server analysis endpoint rejects before processing. When unset or set
+to any other value, the existing free POC remains available. Existing reports
+and jobs are unaffected. This flag does not enable paid reviews. The internal
+`/analyze` prompt-testing page, its renderer, and its non-persisting endpoint
+were removed; the landing flow is the only review submission path.
+
+### D14 — Public policy pages moved forward (2026-09-17)
+
+Phase 4 public policy work was approved and brought forward. Privacy, terms,
+refunds, and contact pages are implemented with `soporte@cotizalupa.com` for
+support/privacy requests and Jose Carlos Pereyra Leon as the operator. Verify
+the mailbox works before submission. These pages describe the current free
+POC separately from the future paid service; the product is not launch ready.
+
 ## Phase status
 
 - [x] 0. Scaffold (this file's baseline)
@@ -181,18 +201,20 @@ undecided and are not part of this phase.
   read/delete adapter, and mechanical validation are built. Still open:
   `pnpm db:migrate` on dev, presigned upload, persisted order flow, pre-check
 - [ ] 2. Producto: Astra → Zod, `processNext()`, and persisted `/r/{token}`
-  rendering are built. Still open: wiring the paid order flow
+  rendering are built. `REVIEWS_DISABLED` is available for the free POC.
+  Still open: wiring the paid order flow
 - [ ] 3. Money: Paddle adapter, verified idempotent webhook/return path, and
   checkout file freeze. Meta CAPI is still needed (`Purchase` on `PAID` only).
-- [ ] 4. Producción: sweep/retry mechanisms are built. Still open: deployment
-  runbook validation, privacy policy, and sandbox-to-live charge/refund sign-off.
+- [ ] 4. Producción: sweep/retry mechanisms are built and the public policy
+  pages are implemented. Still open: mailbox verification,
+  deployment runbook validation, and sandbox-to-live charge/refund sign-off.
 
 ## Open questions
 
-Paddle, before writing `payments.ts`: product accepted? one-shot USD?
-signed webhook + retries + stable event id? checkout only after pre-check?
-refunds? invoice language + LATAM VAT/IGV? Peru-resident payouts? ToS
-vs AI/document-upload.
+Paddle application and live-domain review, before writing `payments.ts`:
+one-shot USD? signed webhook + retries + stable event id? checkout only after
+pre-check? refunds? invoice language + LATAM VAT/IGV? Peru-resident payouts?
+ToS vs AI/document-upload.
 
 Accountant, before first live charge: CotizaLupa→Paddle booking;
 exportación de servicios (four SUNAT conditions, do not assume);

@@ -1,0 +1,249 @@
+@import url("https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Source+Serif+4:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap");
+
+.legal-page {
+  --paper: #f8f7f2;
+  --ink: #282823;
+  --muted: #66665e;
+  --blue: #b33127;
+  --line: #cccac1;
+  --display: "Source Serif 4", Georgia, serif;
+  font: 16px/1.65 "Libre Franklin", sans-serif;
+  min-height: 100vh;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.legal-header {
+  max-width: 1296px;
+  margin: 0 auto;
+  min-height: 105px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  border-bottom: 1px solid var(--line);
+}
+
+.legal-brand,
+.legal-footer-brand {
+  font-family: var(--display);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -1.4px;
+  white-space: nowrap;
+}
+
+.legal-brand {
+  font-size: 32px;
+}
+
+.legal-brand span,
+.legal-footer-brand span {
+  font-style: italic;
+}
+
+.legal-brand .legal-brand-period,
+.legal-footer-brand .legal-brand-period {
+  color: var(--blue);
+  font-style: normal;
+}
+
+.legal-nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 22px;
+  font-size: 14px;
+}
+
+.legal-nav a,
+.legal-footer a {
+  border-bottom: 1px solid transparent;
+}
+
+.legal-nav a:hover,
+.legal-footer a:hover {
+  border-color: var(--blue);
+}
+
+.legal-main {
+  max-width: 840px;
+  margin: 0 auto;
+  padding: 80px 0 100px;
+}
+
+.legal-eyebrow {
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+}
+
+.legal-main h1 {
+  margin: 20px 0 24px;
+  font-size: clamp(54px, 7vw, 82px);
+  line-height: 1;
+  letter-spacing: -3px;
+}
+
+.legal-intro {
+  max-width: 680px;
+  color: var(--muted);
+  font-size: 19px;
+  line-height: 1.7;
+}
+
+.legal-notice {
+  margin: 42px 0 52px;
+  padding: 20px 22px;
+  border-left: 2px solid var(--blue);
+  background: #f2ead6;
+}
+
+.legal-notice p {
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.legal-content {
+  border-top: 1px solid var(--line);
+}
+
+.legal-content section {
+  padding: 32px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.legal-content h2 {
+  margin-bottom: 15px;
+  font-size: 34px;
+  line-height: 1.2;
+  letter-spacing: -0.7px;
+}
+
+.legal-content p,
+.legal-content li {
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.75;
+}
+
+.legal-content p + p {
+  margin-top: 16px;
+}
+
+.legal-content ul {
+  margin: 0;
+  padding-left: 22px;
+}
+
+.legal-content li + li {
+  margin-top: 7px;
+}
+
+.legal-content a {
+  color: var(--blue);
+  border-bottom: 1px solid currentColor;
+}
+
+.legal-footer {
+  max-width: 1296px;
+  margin: 0 auto;
+  padding: 32px 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 18px 25px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.legal-footer-brand {
+  color: var(--ink);
+  font-size: 28px;
+}
+
+.legal-footer > span {
+  margin-left: auto;
+}
+
+@media (max-width: 920px) {
+  .legal-header,
+  .legal-main,
+  .legal-footer {
+    margin-inline: 5%;
+  }
+}
+
+@media (max-width: 640px) {
+  .legal-header {
+    min-height: 82px;
+    align-items: flex-start;
+    flex-direction: column;
+    justify-content: center;
+    gap: 14px;
+  }
+
+  .legal-brand {
+    font-size: 28px;
+  }
+
+  .legal-nav {
+    justify-content: flex-start;
+    gap: 8px 18px;
+    font-size: 13px;
+  }
+
+  .legal-main {
+    padding: 52px 0 68px;
+  }
+
+  .legal-main h1 {
+    margin-top: 17px;
+    font-size: clamp(48px, 15vw, 70px);
+    letter-spacing: -2px;
+  }
+
+  .legal-intro {
+    font-size: 17px;
+  }
+
+  .legal-notice {
+    margin: 32px 0 42px;
+  }
+
+  .legal-content section {
+    padding: 26px 0;
+  }
+
+  .legal-content h2 {
+    font-size: 29px;
+  }
+
+  .legal-content p,
+  .legal-content li {
+    font-size: 15px;
+  }
+
+  .legal-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .legal-footer > span {
+    margin-left: 0;
+  }
+}
+
+body:has(.legal-page) { margin: 0; }
+.legal-page h1, .legal-page h2 { font-family: var(--display); font-weight: 400; }
+.legal-page p { margin: 0; }
+.legal-page a { color: inherit; text-decoration: none; }
+.legal-page a:focus-visible { outline: 3px solid var(--blue); outline-offset: 4px; }
+.legal-page .legal-content a { color: var(--blue); }
+.legal-page .legal-header { height: auto; padding-block: 24px; }
+.legal-page .legal-nav { display: flex; }
+
+.legal-notice a { text-decoration: underline; text-underline-offset: 3px; }

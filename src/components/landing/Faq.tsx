@@ -17,32 +17,33 @@ const FAQS: Array<{ question: string; answer: string }> = [
   {
     question: "¿Necesito compartir mis datos personales?",
     answer:
-      "Puedes ocultar nombres, teléfonos, DNI/RUC y direcciones que no sean necesarios. Conserva el alcance, los montos, fechas y condiciones. CotizaLupa usa el archivo solo para generar el reporte y no lo guarda en esta demostración. Cuando el análisis usa IA, el archivo se envía a OpenAI.",
+      "Puedes ocultar nombres, teléfonos, DNI/RUC y direcciones que no sean necesarios. Conserva el alcance, los montos, fechas y condiciones. Al generar el reporte, enviamos el archivo y el contexto a OpenAI. CotizaLupa no guarda el original en esta demo, pero conserva el reporte y los datos extraídos.",
   },
   {
     question: "¿La revisión garantiza que todo está bien?",
     answer:
       "No. Ayuda a identificar omisiones, preguntas y ambigüedades; puede pasar por alto detalles. No es asesoría legal o financiera, peritaje técnico ni certificación. Para una decisión que requiera criterio profesional, consulta al especialista correspondiente.",
   },
-  {
-    question: "¿Puedo pagar y obtener un análisis real ahora?",
-    answer:
-      "Esta versión permite explorar la experiencia y los reportes de ejemplo. Los pagos y el análisis de documentos aún no están habilitados. No se te cobrará ni se presentará un ejemplo como análisis de tu archivo.",
-  },
+
 ];
 
-export function Faq() {
+export function Faq({ reviewsDisabled }: { reviewsDisabled: boolean }) {
   return (
     <section className="section faq">
       <div>
-        <span className="eyebrow">ANTES DE EMPEZAR</span>
-        <h2>
-          Las dudas,
-          <br />{" "}
-          sobre la mesa.
-        </h2>
+        <h2>Preguntas frecuentes</h2>
+        <p>
+          Versión de demostración: explora el formulario y el reporte de
+          ejemplo. Aún no se realizan cobros.
+        </p>
       </div>
       <div className="faq-list">
+        <details>
+          <summary>¿Puedo pagar y obtener un análisis real ahora?</summary>
+          <p>{reviewsDisabled
+            ? "Los pagos y las revisiones no están disponibles. Puedes explorar el formulario y ver el reporte de ejemplo."
+            : "Puedes generar un reporte gratuito con IA. Los pagos aún no están habilitados y no se te cobrará nada."}</p>
+        </details>
         {FAQS.map((faq) => (
           <details key={faq.question}>
             <summary>{faq.question}</summary>

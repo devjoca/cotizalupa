@@ -13,11 +13,11 @@ payments optimally.”
 | | |
 |---|---|
 | Hypothesis | A person pays ~**$12** for one CotizaLupa review |
-| Checkout (MVP) | **Paddle**, pending written product acceptance |
-| Display on the live Peru landing | **S/39** until Paddle is live (same ticket, local copy) |
+| Checkout (MVP) | **Paddle**, pending application and live-domain product review |
+| Display on the live landing | **$12 USD** (Paddle charges in USD) |
 | Recurrence | One-shot. No subscription, no second charge |
 
-`$12 ≈ S/39` at USD/PEN 3.40. One paid order = one quotation = one report.
+`$12 USD` is the ticket (about S/39 at USD/PEN 3.40, shown for reference only). One paid order = one quotation = one report.
 That does not change with the rail.
 
 Do not recopy `docs/mockup/` onto the live landing. The mockup still says
@@ -31,7 +31,7 @@ Acquisition is Meta Ads. SUNAT and the gateway do not force the number. Ads do.
   money at a normal Meta CPA. Do not launch ads at S/20.
 - **S/29** only works if CAC stays near S/12, which a new pixel will not
   deliver in week one.
-- **S/39 / $12** is still tiny next to the mockup quote (S/3,800) or a
+- **$12 USD** is still tiny next to the mockup quote (S/3,800) or a
   50% adelanto (S/1,900). At a base CAC of S/20 it keeps a thin leftover
   even if Astra hits the $1 cap. That is the launch ticket.
 - **S/49** is the A/B, not the default.
@@ -68,21 +68,25 @@ they operate. **You still have Peruvian renta and monthly declarations
 621 is monthly. Nobody should be in SUNAT daily. Per-customer CPE is
 what Paddle removes from the product, not the monthly filing.
 
-### What to send Paddle (product acceptance)
+### Paddle application and product review
 
-Ask for written yes/no before writing `src/server/payments.ts`.
+Paddle does not provide preliminary assessments or preapproval by email. Apply
+with a live HTTPS domain and a functional product for their review. Payment
+eligibility remains pending that application and domain review. Keep the
+questions below for the application and the written record of the outcome
+before writing `src/server/payments.ts`.
 
-> CotizaLupa is a one-shot digital product. The customer uploads one
+> Planned paid service: CotizaLupa is a one-shot digital product. The customer uploads one
 > quotation (PDF or photos), we run a cheap pre-check, then they pay
 > ~USD 12 once (card) and receive a report URL: what is clear, missing,
 > risky, and which questions to ask. No account, no subscription, no
 > physical goods. Initial ads: Spanish, Peru, then other LATAM.
 >
 > We never charge if the document is not exactly one legible quotation.
-> After payment we may still refund if analysis fails
-> (`NOT_ANALYZABLE`). We do not persist DNI, address, card, or billing.
+> If payment succeeds but we cannot deliver the report, we refund the full
+> review price. We do not persist payment-provider DNI, address, card, or billing.
 >
-> Please confirm in writing:
+> Please address these points in the application or review:
 > 1. You accept this product (document upload + AI analysis report).
 > 2. One-shot USD checkout (not subscription) is supported.
 > 3. Webhook: signed, retry policy, stable event id, amount + currency

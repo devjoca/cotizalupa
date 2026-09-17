@@ -14,6 +14,7 @@ import {
 
 interface ReviewDialogProps {
   open: boolean;
+  reviewsDisabled: boolean;
   onClose: () => void;
 }
 
@@ -26,8 +27,10 @@ function scrollToExample() {
     ?.focus({ preventScroll: true });
 }
 
-export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
+export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogProps) {
   const navigate = useNavigate();
+  const [serverDisabled, setServerDisabled] = useState(false);
+  const disabled = reviewsDisabled || serverDisabled;
   const [state, dispatch] = useReducer(flowReducer, initialFlowState);
   const [files, setFiles] = useState<File[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
@@ -110,7 +113,7 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (state.step === 2) {
-      const missing = missingStepTwoField(state, files.length > 0);
+      const missing = missingStepTwoField(state, disabled || files.length > 0);
       if (missing === "file") {
         fileInputRef.current?.focus();
       } else if (missing) {
@@ -119,12 +122,12 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
           ?.focus();
       }
     }
-    dispatch({ type: "next", hasFile: files.length > 0 });
+    dispatch({ type: "next", hasFile: disabled || files.length > 0 });
   }
 
-  // The POC simulates payment approval, then persists and opens the report.
+  // The free POC persists and opens the report without a payment.
   async function runAnalysis() {
-    if (files.length === 0 || analyzing) return;
+    if (disabled || files.length === 0 || analyzing) return;
     const category = CATEGORIES.find((value) => value === state.category);
     const moment = MOMENTS.find((value) => value === state.moment);
     if (!category || !moment) {
@@ -159,6 +162,7 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
         });
         return;
       }
+      if (nextResult.status === "REVIEWS_DISABLED") setServerDisabled(true);
       setAnalysisError(nextResult.message);
     } catch (err) {
       if (requestIdRef.current === requestId) {
@@ -220,13 +224,19 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
       </div>
       <div className="flow-top">
         <span id="step-label">PASO {state.step} DE 3</span>
-        <span>Una revisión · S/39</span>
+        <span>Precio de lanzamiento · $12 USD</span>
       </div>
       <div className="flow-progress">
         <i style={{ width: `${(state.step / 3) * 100}%` }} />
       </div>
       <form id="review-form" noValidate onSubmit={submit}>
         <div id="flow-content">
+          {disabled && (
+            <p className="demo-banner" role="status">
+              Las revisiones aún no están disponibles. Puedes explorar el formulario
+              y ver el reporte de ejemplo. Los archivos que selecciones no se enviarán.
+            </p>
+          )}
           {state.step === 1 && (
             <>
               <h2 id="flow-title" tabIndex={-1}>
@@ -250,7 +260,6 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
               <h2 id="flow-title" tabIndex={-1}>
                 Cuéntanos lo justo.
               </h2>
-              <p>Para enfocar la revisión en tu próxima decisión.</p>
               <label className="field">
                 ¿Qué estás cotizando?
                 <select
@@ -334,9 +343,11 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
               <p className="privacy-note">
                 Puedes ocultar nombres, teléfonos, DNI/RUC y direcciones. El
                 archivo se usa solo para generar el reporte y CotizaLupa no lo
-                guarda en esta demo. Cuando el análisis usa IA, se envía a
-                OpenAI, que puede conservar datos según su configuración y sus
-                políticas.
+                guarda en esta demo. Al generar el reporte, enviamos el archivo y el
+                contexto a OpenAI. Conservamos el reporte y los datos extraídos.
+                OpenAI puede conservar datos según su configuración y sus políticas.
+                Consulta la <a href="/privacidad" target="_blank" rel="noreferrer">política de privacidad</a>
+                {" "}y los <a href="/terminos" target="_blank" rel="noreferrer">términos de uso</a>.
               </p>
               <label className="field">
                 Monto aproximado en soles <small>· opcional</small>
@@ -383,9 +394,13 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
           {state.step === 3 && (
             <>
               <h2 id="flow-title" tabIndex={-1}>
-                Una revisión. Sin suscripción.
+                Confirma tu revisión
               </h2>
-              <p>Este sería el resumen antes de pagar.</p>
+              <p>
+                {disabled
+                  ? "Así será el resumen de tu revisión. La generación está deshabilitada."
+                  : "Revisa los datos antes de generar tu reporte gratuito."}
+              </p>
               <div className="summary-row">
                 <span>Perspectiva</span>
                 <b>Soy cliente</b>
@@ -400,22 +415,22 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
               </div>
               <div className="summary-row">
                 <span>Documento</span>
-                <b>{state.fileName ?? ""}</b>
+                <b>{state.fileName ?? "Ningún archivo seleccionado"}</b>
               </div>
               <div className="summary-row">
                 <span>Incluye</span>
                 <b>Reporte, 3 prioridades y textos para copiar</b>
               </div>
               <div className="summary-row summary-total">
-                <span>Total por revisión</span>
-                <b>S/39</b>
+                <span>Precio previsto al habilitar pagos</span>
+                <b>$12 USD</b>
               </div>
               <div className="demo-banner">
                 <strong>Esta demostración no realiza ningún cobro.</strong>
                 <br />
-                El botón simula la confirmación del pago y abre tu reporte.
-                Cuando el análisis usa IA, el archivo se envía a OpenAI.
-                CotizaLupa no lo guarda en esta demo.
+                {disabled
+                  ? "La generación de reportes está deshabilitada."
+                  : "Al generar el reporte, enviamos el archivo y el contexto a OpenAI para analizarlos con IA. CotizaLupa no guarda el archivo original ni tu preocupación escrita; conserva el reporte y los datos extraídos."}
               </div>
               <button
                 type="button"
@@ -456,12 +471,14 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
               type="button"
               className="button blue"
               id="next"
-              disabled={files.length === 0 || analyzing}
+              disabled={disabled || files.length === 0 || analyzing}
               onClick={runAnalysis}
             >
-              {analyzing
-                ? "Preparando reporte…"
-                : "Simular pago y ver mi reporte"}
+              {disabled
+                ? "Revisiones no disponibles"
+                : analyzing
+                  ? "Preparando reporte…"
+                  : "Generar mi reporte gratis"}
             </button>
           ) : (
             <button type="submit" className="button blue" id="next">

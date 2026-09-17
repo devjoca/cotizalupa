@@ -1,20 +1,6 @@
 export function RoleCards({ onStart }: { onStart: () => void }) {
   return (
     <section id="perspectivas" className="section perspective-section">
-      <div className="section-heading">
-        <div>
-          <span className="eyebrow">EMPEZAMOS POR TU LADO.</span>
-          <h2>
-            Antes de pagar,
-            <br />
-            pregunta lo que falta.
-          </h2>
-        </div>
-        <p>
-          Hoy revisamos cotizaciones desde el lado del cliente. La perspectiva
-          proveedor llega pronto.
-        </p>
-      </div>
       <div className="perspective-grid">
         <button className="perspective-card client" onClick={onStart}>
           <span className="card-number">01 / SOY CLIENTE</span>

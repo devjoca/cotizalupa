@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 
+import { getReviewsAvailability } from "../server/reviews";
+
 import landingCss from "../styles/landing.css?url";
 import { Hero } from "../components/landing/Hero";
 import { RoleCards } from "../components/landing/RoleCards";
@@ -20,16 +22,18 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Descubre qué falta aclarar en una cotización antes de aceptarla. Revisión para clientes. S/39, sin suscripción.",
+          "Descubre qué falta aclarar en una cotización antes de aceptarla. Revisión para clientes. $12 USD, pago único.",
       },
       { name: "theme-color", content: "#b33127" },
     ],
     links: [{ rel: "stylesheet", href: landingCss }],
   }),
+  loader: () => getReviewsAvailability(),
   component: Landing,
 });
 
 function Landing() {
+  const { reviewsDisabled } = Route.useLoaderData();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [flowKey, setFlowKey] = useState(0);
 
@@ -58,9 +62,13 @@ function Landing() {
         </button>
       </header>
       <main>
+        <div className="availability-note" role="status">
+          {reviewsDisabled
+            ? "Las revisiones aún no están disponibles. Explora el formulario o mira el reporte de ejemplo. No se enviarán archivos ni se realizarán cobros."
+            : "Demo gratuita con IA. Aún no se realizan cobros. Precio previsto al habilitar pagos: $12 USD por revisión."}
+        </div>
         <Hero onStart={startFlow} />
         <div className="category-strip">
-          <span>PARA ACUERDOS GRANDES Y PEQUEÑOS</span>
           <div>
             Muebles a medida <i>✳</i> Remodelaciones <i>✳</i> Desarrollo web{" "}
             <i>✳</i> Eventos <i>✳</i> Y mucho más
@@ -70,13 +78,14 @@ function Landing() {
         <Example />
         <Method />
         <Pricing onStart={startFlow} />
-        <Faq />
+        <Faq reviewsDisabled={reviewsDisabled} />
         <Closing onStart={startFlow} />
       </main>
       <Footer />
       <ReviewDialog
         key={flowKey}
         open={dialogOpen}
+        reviewsDisabled={reviewsDisabled}
         onClose={() => setDialogOpen(false)}
       />
     </>

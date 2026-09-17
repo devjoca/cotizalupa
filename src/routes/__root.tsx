@@ -13,7 +13,7 @@ export const Route = createRootRoute({
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'TanStack Start Starter',
+        title: 'CotizaLupa',
       },
     ],
     links: [
@@ -23,6 +23,12 @@ export const Route = createRootRoute({
       },
     ],
   }),
+  notFoundComponent: () => (
+    <main style={{ maxWidth: 720, margin: '2rem auto', padding: '0 1rem' }}>
+      <h1>Página no encontrada</h1>
+      <a href="/">Volver al inicio</a>
+    </main>
+  ),
   shellComponent: RootDocument,
 })
 

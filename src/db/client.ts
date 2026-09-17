@@ -13,7 +13,7 @@ const LOCAL_DATABASE_URL =
   "postgresql://cotizalupa:cotizalupa@127.0.0.1:55432/cotizalupa";
 
 export function resolveDatabaseUrl(
-  env: Pick<NodeJS.ProcessEnv, "DATABASE_URL" | "NODE_ENV"> = process.env,
+  env: Partial<Pick<NodeJS.ProcessEnv, "DATABASE_URL" | "NODE_ENV">> = process.env,
 ): string {
   if (env.DATABASE_URL) return env.DATABASE_URL;
   if (env.NODE_ENV === "production") {

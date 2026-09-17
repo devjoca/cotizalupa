@@ -9,6 +9,7 @@ import {
   analyzeQuotation,
   type AnalysisInputFile,
 } from "./ai";
+import { reviewsDisabled } from "./reviews.server";
 import { analysisGuard } from "./analysisGuard";
 import { captureOperationalError } from "./monitoring";
 import {
@@ -63,6 +64,13 @@ const FilesInput = z.strictObject({
 });
 
 async function runAnalysis(data: z.infer<typeof FilesInput>) {
+  if (reviewsDisabled()) {
+    return {
+      status: "REVIEWS_DISABLED" as const,
+      message: "Las revisiones aún no están disponibles. No se ha generado ningún reporte ni realizado ningún cobro.",
+    };
+  }
+
   const clientIp = getRequestIP({ xForwardedFor: true }) ?? "unknown";
   if (!analysisGuard.takeRateLimit(clientIp)) {
     return {
@@ -150,10 +158,6 @@ async function runAnalysis(data: z.infer<typeof FilesInput>) {
     release();
   }
 }
-
-export const analyzeFiles = createServerFn({ method: "POST" })
-  .validator(FilesInput)
-  .handler(({ data }) => runAnalysis(data));
 
 export const analyzeAndPersistReport = createServerFn({ method: "POST" })
   .validator(FilesInput)

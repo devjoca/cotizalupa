@@ -39,16 +39,7 @@ export function Example() {
   return (
     <section id="ejemplo" className="examples section">
       <div className="example-intro">
-        <span className="eyebrow">MENOS SUPUESTOS. MEJORES PREGUNTAS.</span>
-        <h2>
-          Esto es lo que
-          <br />{" "}
-          te llevas.
-        </h2>
-        <p>
-          Un reporte que conecta lo que dice tu cotización con lo que aún
-          necesitas aclarar.
-        </p>
+        <h2>Así se ve el reporte</h2>
         <div
           className="segmented"
           role="group"
