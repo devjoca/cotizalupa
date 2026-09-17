@@ -25,7 +25,8 @@ eval case so it does not repeat.
 
 ### 2. Privacy by deletion, not by policy
 
-Originals live in the bucket until `delete_after`, then they are gone. No persisted
+Originals become eligible for the manual deletion sweep at `delete_after`; the
+drain removes them and records `deleted_at`. No persisted
 OCR, no full text, no conversations — only `quotation_facts`, the report, and
 operational metadata. OpenAI always with `store: false`. Never add a table, log
 line, or cache that keeps document content past its purpose.
@@ -33,9 +34,9 @@ line, or cache that keeps document content past its purpose.
 ### 3. One process, boring infra
 
 Single Railway service (web + jobs in the same process), Postgres as the queue
-(one claim query), in-memory rate limit, Railway logs. No Redis, no workflow
-engine, no vector DB, no admin UI, no Sentry. If your design needs new infra for
-the MVP, the design is wrong.
+(one claim query), in-memory rate limit, Railway logs, and minimal server-only
+Sentry error reporting. No Redis, workflow engine, vector DB, admin UI, tracing,
+or replay. If your design needs more infra for the MVP, the design is wrong.
 
 ## A note from Joca
 
@@ -110,17 +111,20 @@ order-flow work done, walk this list and say which entries applied:
 - **Entry points.** Upload is reachable from the landing CTA, the dialog, and the
   pricing section. Fixing one is not fixing the flow. The mockup in `docs/mockup/`
   shows all three — check each.
-- **Statuses.** Every transition in `PLAN.md` "Estados" needs its edge: expiry timers
-  (24 h), retry path (`PAYMENT_FAILED` can retry), 3-attempt cap, manual refund step.
+- **Statuses.** Every transition in `PLAN.md` "Estados" needs its edge: 30-day
+  expiry for unpaid orders, retry path (`PAYMENT_FAILED` can retry), 3-attempt
+  cap, payment reconciliation, and the manual refund step.
   A status with no exit is a bug.
 - **Reverse states.** If you added a way in, add the way out and the way to see it.
-  `PAYMENT_PENDING` needs expiry and retry. `PROCESSING` needs reclaim and failure.
+  `PAYMENT_PENDING` needs provider reconciliation, never a timeout guess.
+  `PROCESSING` needs reclaim and failure.
   A one-way door strands paid users.
 - **Immutability boundary.** From `PAYMENT_PENDING` on, files are frozen: what we
   validated = what we charged = what we analyze. Any edit path must create a new order.
-- **Report page.** `/r/{token}` looks up `sha256(token)`, carries no Meta pixel, and
-  warns users without email to keep the link. Any change to report data must render
-  here, not just in the JSON.
+- **Report page.** `/r/{token}` looks up `sha256(token)`, carries no Meta pixel,
+  and renders only the persisted report. Email delivery and PDF download remain
+  product decisions for a later phase. Any change to report data must render here,
+  not just in the JSON.
 - **Privacy.** Any new field, log, or cache holding document content must have a
   deletion story. If it does not expire with `delete_after`, do not add it.
 - **Docs.** Check whether the change makes `PLAN.md` or `ops/queries.sql` inaccurate.
@@ -132,14 +136,14 @@ order-flow work done, walk this list and say which entries applied:
   pnpm 12 (`packageManager` pins it; mise resolves `pnpm@latest` to it).
 - `pnpm dev` starts the app on port 3000 (or the next free port if 3000 is
   taken — a kubectl OTel forward holds it on Joca's machine). One process serves web + jobs.
-- DB is Neon Postgres via `pg` Pool over TCP (`DATABASE_URL` in `.env`, see
-  `.env.example`). No serverless driver, no local emulator — use a dev database,
-  never production.
-- Files go to the Railway Private Bucket via presigned URLs. No local-disk uploads
-  path that bypasses validation.
-- A 60 s `setInterval` calls `processNext()` for stuck orders and expired deletes.
-  The payment webhook handler calls it too after responding 200. Stop what you
-  started: kill only PIDs you spawned.
+- `pnpm dev:infra` starts local PostgreSQL and MinIO from `compose.yaml`.
+  Deployed DB is Neon Postgres via the same `pg` Pool; deployed files use the
+  Railway Private Bucket through the same S3 API. Never use production for dev.
+- There is no local-disk upload path that bypasses validation.
+- The phase 3 payment webhook will call `processNext()` after responding 200.
+  There is no timer. `pnpm ops:drain` is the manual recovery and deletion
+  backstop; agents never run it against production. Stop what you started: kill
+  only PIDs you spawned.
 - Never commit or publish `.env`, tokens, sandbox credentials, or report URLs.
 
 ## Test data
@@ -157,6 +161,7 @@ Real quotations are the most sensitive data we hold. Treat them accordingly:
 
 - Smallest proof that the change works. `pnpm test` (Vitest, deterministic, free,
   runs in CI) for the files you touched; targeted typecheck for the scope you changed.
+  DB-backed tests need `pnpm dev:infra` locally and PostgreSQL in CI.
 - **MVP testing bar:** payments, state transitions, idempotency, and file
   immutability always ship with tests. Everything else is tested lightly or as
   its behavior stabilizes — a prototype doesn't earn a suite before it settles.
@@ -176,14 +181,12 @@ Real quotations are the most sensitive data we hold. Treat them accordingly:
 
 The provider is an adapter (`src/server/payments.ts`). Order states do not
 change with the brand. MVP rail is **Paddle** (D8), pending written product
-acceptance. Izipay is the deferred local rail — do not encode its payload
-shape in order logic.
+acceptance. Keep its payload shape inside the adapter rather than order logic.
 
 Money code has one extra reviewer: the ledger. Every payments change must show:
 
 - Event authenticated, success, matching order id, amount, and currency before
-  any state change. (Paddle: their signature + `transaction_id`. Izipay, if we
-  switch: `payloadHttp`, `code === "00"`, `orderNumber`.)
+  any state change. Paddle requires its signature and `transaction_id`.
 - `payment_events.provider_event_id` UNIQUE: duplicates answer 200 and stop.
 - Conditional transition (`PAID` only from `PAYMENT_PENDING`, zero rows = no-op).
 - Webhook and browser return entering through the same path — tested, not asserted.
@@ -233,7 +236,7 @@ Most code changes do not need a documentation change. Agents can read the code.
 ```
 CREATE ORDER → UPLOAD → MECHANICAL VALIDATION → PRE-CHECK IA → READY_FOR_PAYMENT
 → CHECKOUT (Paddle MVP) → PAID → CLAIM → ASTRA ANALYSIS → ZOD → SAVE REPORT + FACTS
-→ COMPLETED → DELETE ORIGINAL ≤ 24 h
+→ COMPLETED → ORIGINAL DUE → MANUAL DRAIN DELETES IT
 ```
 
 Clients upload to presigned URLs. The server validates mechanically (`file-type`,
@@ -250,7 +253,7 @@ saves report + facts, and marks `COMPLETED`. One sweep deletes originals past
 - `src/server/validation.ts` — mechanical validation (MIME, size, pages, sha256).
 - `src/server/payments.ts` — payment adapter (Paddle first): session, webhook, idempotency.
 - `src/server/process.ts` — `processNext()`, claim query, Astra analysis, retries.
-- `src/server/storage.ts` — bucket presigned URLs, immutability, deletion sweep.
+- `src/server/storage.ts` — bucket reads, integrity checks, and deletion sweep.
 - `src/db/` — Drizzle schema + `pg` Pool client (`schema.ts`, `client.ts`).
 - `src/lib/schemas.ts` — report + `quotation_facts` schemas (Zod 4, strict).
 - `ops/queries.sql` — hand-run operational queries (no admin UI).
@@ -278,5 +281,4 @@ saves report + facts, and marks `COMPLETED`. One sweep deletes originals past
 - Security matters most at three seams: payment verification, report-token lookup,
   and file deletion. Elsewhere, prefer simplicity over hardening.
 - Paddle product-acceptance questions go out before writing the adapter
-  (`docs/pricing.md`). Izipay questions only if we switch. Flag anything that
-  answers either sooner.
+  (`docs/pricing.md`). Flag anything that answers them sooner.

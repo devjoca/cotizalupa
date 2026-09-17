@@ -1,12 +1,13 @@
 import { useEffect, useReducer, useRef, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 
-import { ReportView, type AnalyzeResult } from "../ReportView";
 import { fileToUpload } from "#/lib/fileBase64";
 import { CATEGORIES, MOMENTS, OTHER_CATEGORY } from "#/lib/reviewContext";
-import { analyzeFiles } from "#/server/analyze";
+import { analyzeAndPersistReport } from "#/server/analyze";
 import {
   flowReducer,
   initialFlowState,
+  missingStepTwoField,
   validatePickedFiles,
   type FlowFields,
 } from "./review-flow";
@@ -26,10 +27,10 @@ function scrollToExample() {
 }
 
 export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
+  const navigate = useNavigate();
   const [state, dispatch] = useReducer(flowReducer, initialFlowState);
   const [files, setFiles] = useState<File[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
-  const [result, setResult] = useState<AnalyzeResult | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -45,7 +46,6 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
     requestIdRef.current += 1;
     dispatch({ type: "open" });
     setFiles([]);
-    setResult(null);
     setAnalysisError(null);
     setAnalyzing(false);
     if (!dialog.open) dialog.showModal();
@@ -90,13 +90,20 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (state.step === 2 && files.length === 0) {
-      fileInputRef.current?.focus();
+    if (state.step === 2) {
+      const missing = missingStepTwoField(state, files.length > 0);
+      if (missing === "file") {
+        fileInputRef.current?.focus();
+      } else if (missing) {
+        dialogRef.current
+          ?.querySelector<HTMLElement>(`[name="${missing}"]`)
+          ?.focus();
+      }
     }
     dispatch({ type: "next", hasFile: files.length > 0 });
   }
 
-  // Payment is not integrated yet: step 3 runs the real analysis directly.
+  // The POC simulates payment approval, then persists and opens the report.
   async function runAnalysis() {
     if (files.length === 0 || analyzing) return;
     const category = CATEGORIES.find((value) => value === state.category);
@@ -116,17 +123,24 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
     };
     setAnalyzing(true);
     setAnalysisError(null);
-    setResult(null);
     try {
       const uploads = await Promise.all(fileSnapshot.map(fileToUpload));
-      const nextResult = await analyzeFiles({
+      const nextResult = await analyzeAndPersistReport({
         data: {
           files: uploads,
           perspective: "customer",
           context: contextSnapshot,
         },
       });
-      if (requestIdRef.current === requestId) setResult(nextResult);
+      if (requestIdRef.current !== requestId) return;
+      if (nextResult.status === "COMPLETED") {
+        await navigate({
+          to: "/r/$token",
+          params: { token: nextResult.report_token },
+        });
+        return;
+      }
+      setAnalysisError(nextResult.message);
     } catch (err) {
       if (requestIdRef.current === requestId) {
         setAnalysisError(
@@ -179,7 +193,7 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
       <div className="flow-progress">
         <i style={{ width: `${(state.step / 3) * 100}%` }} />
       </div>
-      <form id="review-form" onSubmit={submit}>
+      <form id="review-form" noValidate onSubmit={submit}>
         <div id="flow-content">
           {state.step === 1 && (
             <>
@@ -262,9 +276,10 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
               </label>
               <p className="privacy-note">
                 Puedes ocultar nombres, teléfonos, DNI/RUC y direcciones. El
-                archivo se envía a OpenAI para generar el reporte. CotizaLupa
-                no lo guarda en esta demo; OpenAI puede conservar datos según
-                su configuración y sus políticas.
+                archivo se usa solo para generar el reporte y CotizaLupa no lo
+                guarda en esta demo. Cuando el análisis usa IA, se envía a
+                OpenAI, que puede conservar datos según su configuración y sus
+                políticas.
               </p>
               <label className="field">
                 Monto aproximado en soles <small>· opcional</small>
@@ -339,10 +354,11 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
                 <b>S/39</b>
               </div>
               <div className="demo-banner">
-                <strong>El pago todavía no está habilitado.</strong>
+                <strong>Esta demostración no realiza ningún cobro.</strong>
                 <br />
-                Puedes correr el análisis real sin costo mientras validamos. El
-                archivo se envía a OpenAI y CotizaLupa no lo guarda en esta demo.
+                El botón simula la confirmación del pago y abre tu reporte.
+                Cuando el análisis usa IA, el archivo se envía a OpenAI.
+                CotizaLupa no lo guarda en esta demo.
               </div>
               <button
                 type="button"
@@ -359,7 +375,6 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
                   No se pudo analizar: {analysisError}
                 </p>
               )}
-              {result && <ReportView result={result} />}
             </>
           )}
         </div>
@@ -373,7 +388,6 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
             id="back"
             disabled={analyzing}
             onClick={() => {
-              setResult(null);
               setAnalysisError(null);
               dispatch({ type: "back" });
             }}
@@ -389,10 +403,8 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
               onClick={runAnalysis}
             >
               {analyzing
-                ? "Analizando…"
-                : result
-                  ? "Analizar de nuevo"
-                  : "Analizar mi cotización"}
+                ? "Preparando reporte…"
+                : "Simular pago y ver mi reporte"}
             </button>
           ) : (
             <button type="submit" className="button blue" id="next">

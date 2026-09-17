@@ -165,6 +165,42 @@ describe("analyzeQuotation", () => {
     });
   });
 
+  it("AI_STUB=1 returns a stub without touching the network", async () => {
+    const saved = process.env.AI_STUB;
+    process.env.AI_STUB = "1";
+    try {
+      const create = vi.fn(async () => {
+        throw new Error("network must not be touched");
+      });
+      const client = { responses: { create } } as unknown as OpenAI;
+      const result = await analyzeQuotation(files, { client, context });
+
+      expect(create).not.toHaveBeenCalled();
+      expect(result.model).toBe("stub");
+      expect(result.usage).toEqual({ input_tokens: 0, output_tokens: 0 });
+      expect(isAnalyzable(result.analysis)).toBe(true);
+    } finally {
+      if (saved !== undefined) process.env.AI_STUB = saved;
+      else delete process.env.AI_STUB;
+    }
+  });
+
+  it("AI_STUB=1 needs no client and no API key", async () => {
+    const savedStub = process.env.AI_STUB;
+    const savedKey = process.env.OPENAI_API_KEY;
+    process.env.AI_STUB = "1";
+    delete process.env.OPENAI_API_KEY;
+    try {
+      const result = await analyzeQuotation(files, { context });
+      expect(result.model).toBe("stub");
+      expect(isAnalyzable(result.analysis)).toBe(true);
+    } finally {
+      if (savedStub !== undefined) process.env.AI_STUB = savedStub;
+      else delete process.env.AI_STUB;
+      if (savedKey !== undefined) process.env.OPENAI_API_KEY = savedKey;
+    }
+  });
+
   it("defaults to the documented model when none is configured", async () => {
     const saved = process.env.OPENAI_ANALYSIS_MODEL;
     delete process.env.OPENAI_ANALYSIS_MODEL;

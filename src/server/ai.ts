@@ -328,6 +328,44 @@ export class AiRequestFailed extends Error {
 let shared: OpenAI | null = null;
 const client = (override?: OpenAI): OpenAI => override ?? (shared ??= new OpenAI());
 
+// Local dev without spending: AI_STUB=1 returns a fixed valid analysis and
+// never constructs the OpenAI client (no key, no network). Unset for real
+// analysis. The fixture is typed as Analysis and labeled [STUB] so it cannot
+// pass as a real report.
+function isStubEnabled(): boolean {
+  return process.env.AI_STUB === "1";
+}
+
+const STUB_ANALYSIS: Analysis = {
+  document: {
+    is_quotation: true,
+    quotation_count: 1,
+    is_legible: true,
+    is_single_commercial_proposal: true,
+    rejection_reason: null,
+  },
+  clear_items: [
+    {
+      title: "[STUB] Análisis local sin modelo",
+      detail:
+        "Respuesta fija de desarrollo (AI_STUB=1). No refleja el documento.",
+    },
+  ],
+  gaps: [],
+  what_if: [],
+  priorities: [],
+  quotation_facts: {
+    document_type: "quotation",
+    service: null,
+    supplier: null,
+    amount: { value_cents: null, currency: null },
+    summary: null,
+    scope_summary: null,
+    delivery_summary: null,
+    payment_summary: null,
+  },
+};
+
 function modelId(override?: string): string {
   return override ?? process.env.OPENAI_ANALYSIS_MODEL ?? DEFAULT_MODEL;
 }
@@ -388,6 +426,17 @@ export async function analyzeQuotation(
   const model = modelId(opts.model);
   const perspective = opts.perspective ?? "customer";
   const started = Date.now();
+
+  if (isStubEnabled()) {
+    console.warn("[ai] AI_STUB=1, returning stub analysis without calling OpenAI");
+    return {
+      analysis: STUB_ANALYSIS,
+      usage: { input_tokens: 0, output_tokens: 0 },
+      latency_ms: Date.now() - started,
+      model: "stub",
+      prompt_version: ANALYSIS_PROMPT_VERSION,
+    };
+  }
 
   let response;
   try {

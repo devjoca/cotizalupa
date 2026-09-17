@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   INVALID_FILE_ERROR,
+  MISSING_CATEGORY_ERROR,
   MISSING_FILE_ERROR,
+  MISSING_MOMENT_ERROR,
+  MISSING_OTHER_ERROR,
   flowReducer,
   initialFlowState,
   validatePickedFile,
@@ -32,6 +35,7 @@ describe("review flow", () => {
       ...initialFlowState,
       step: 2 as const,
       category: "Remodelación",
+      moment: "Antes de aceptar",
     };
     const state = flowReducer(before, { type: "next", hasFile: false });
     expect(state.step).toBe(2);
@@ -39,9 +43,34 @@ describe("review flow", () => {
     expect(state.category).toBe("Remodelación");
   });
 
+  it("validates required context in form order", () => {
+    const stepTwo = { ...initialFlowState, step: 2 as const };
+    expect(flowReducer(stepTwo, { type: "next", hasFile: false }).error).toBe(
+      MISSING_CATEGORY_ERROR,
+    );
+    expect(
+      flowReducer(
+        { ...stepTwo, category: "Otro" },
+        { type: "next", hasFile: true },
+      ).error,
+    ).toBe(MISSING_OTHER_ERROR);
+    expect(
+      flowReducer(
+        { ...stepTwo, category: "Remodelación" },
+        { type: "next", hasFile: true },
+      ).error,
+    ).toBe(MISSING_MOMENT_ERROR);
+  });
+
   it("advances from step 2 to step 3 with a file", () => {
     const state = flowReducer(
-      { ...initialFlowState, step: 2, fileName: "cotizacion.pdf" },
+      {
+        ...initialFlowState,
+        step: 2,
+        category: "Remodelación",
+        moment: "Antes de aceptar",
+        fileName: "cotizacion.pdf",
+      },
       { type: "next", hasFile: true },
     );
     expect(state.step).toBe(3);

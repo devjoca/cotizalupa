@@ -16,7 +16,6 @@ payments optimally.”
 | Checkout (MVP) | **Paddle**, pending written product acceptance |
 | Display on the live Peru landing | **S/39** until Paddle is live (same ticket, local copy) |
 | Recurrence | One-shot. No subscription, no second charge |
-| Izipay | Deferred. Local rail if people pay and Yape/conversion requires it |
 
 `$12 ≈ S/39` at USD/PEN 3.40. One paid order = one quotation = one report.
 That does not change with the rail.
@@ -26,9 +25,7 @@ S/20; that is the visual baseline, not the price.
 
 ## Why this ticket (not 20, 29, or 49)
 
-Acquisition is Meta Ads. SUNAT and the gateway do not force the number.
-Ads do. Full Izipay-unit math is in [Local rail (Izipay)](#local-rail-izipay)
-for when we optimize Peru. It is not the MVP path.
+Acquisition is Meta Ads. SUNAT and the gateway do not force the number. Ads do.
 
 - **S/20** (mockup) covers inference + a cheap gateway and then loses
   money at a normal Meta CPA. Do not launch ads at S/20.
@@ -39,9 +36,8 @@ for when we optimize Peru. It is not the MVP path.
   even if Astra hits the $1 cap. That is the launch ticket.
 - **S/49** is the A/B, not the default.
 
-Paddle is **not cheaper**. Accept ~S/1–2 less leftover per sale during
-validation to keep B2C boletas, a local PSP, and future LATAM tax out of
-the experiment. First validate Purchase. Then optimize rails.
+Paddle's exact take remains pending its written quote. The MVP accepts the MoR
+premium to keep consumer invoicing and payment-tax handling out of the product.
 
 ## MVP rail — Paddle (MoR)
 
@@ -53,8 +49,8 @@ upload → mechanical validation → pre-check → Paddle checkout
 ```
 
 Concentrate the MVP on landing → Purchase conversion → perceived report
-quality. Do not build a facturador, Yape, or Izipay IPN to learn whether
-anyone pays $12.
+quality. Do not build a facturador or second checkout to learn whether anyone
+pays $12.
 
 ### What Paddle does not erase
 
@@ -71,13 +67,6 @@ they operate. **You still have Peruvian renta and monthly declarations
 
 621 is monthly. Nobody should be in SUNAT daily. Per-customer CPE is
 what Paddle removes from the product, not the monthly filing.
-
-### Switch back to Izipay when either
-
-- People pay, and we then optimize margin/conversion in Peru, or
-- Paddle checkout without Yape shows a real drop in Purchase conversion.
-
-Until then, do not add a second checkout.
 
 ### What to send Paddle (product acceptance)
 
@@ -108,7 +97,7 @@ Ask for written yes/no before writing `src/server/payments.ts`.
 > 8. Anything in the ToS that bans AI, document processing, or ads-driven
 >    consumer checkout.
 
-## Ledger (any rail)
+## Payment ledger
 
 Provider is an adapter. These rules do not change:
 
@@ -138,8 +127,7 @@ adapter can change without a new order model.
 | Pre-check + crumbs | ~S/0.30 | Cheapest model |
 | Peru Meta CPC | S/0.30–S/1.50 | Local 2026 ranges |
 | Peru conversion CPA | S/15–S/45 | Cold conversion |
-| Paddle take | higher than Izipay | MoR premium. Exact rate: their written quote |
-| Izipay (if we switch) | 3.44% + IGV | Public card figure, Apr 2026. Confirm tarifario |
+| Paddle take | Pending written quote | MoR premium; do not invent the rate |
 
 ## Meta CAC (unchanged by the rail)
 
@@ -152,10 +140,9 @@ click.
 | Base | S/20 | Cold conversion after a few weeks |
 | Harsh | S/35 | Learning, weak creative, many rejects |
 
-Break-even CAC at the $1 cap is in the mid-S/20s on the Izipay math;
-Paddle is a bit worse (MoR take + FX). Price for 2–4% click → pay, not
-7%. Learning-phase losses are funded with cash, not by cutting the
-sticker to S/20.
+Break-even CAC depends on Paddle's written quote and FX. Price for 2–4%
+click → pay, not 7%. Learning-phase losses are funded with cash, not by
+cutting the sticker to S/20.
 
 Meta often needs ~50 purchases/week to leave learning (~S/7,000/month
 media at harsh CAC). Agency fees extra. Accountant treats Meta IGV.
@@ -168,26 +155,9 @@ media at harsh CAC). Agency fees extra. Accountant treats Meta IGV.
 - `reports.cost_usd`: log and inspect at $1.
 - Never spend Astra before money clears.
 
-## Local rail (Izipay)
-
-Only after the kill criteria above. Then we are the merchant to the
-user: boleta electrónica a consumidor final, SIRE, 621, renta 1% of
-net. Izipay invoices **us** for acquiring; their checkout voucher is
-not our CPE.
-
-At S/39, $1 inference, Izipay 3.44%: leftover **before ads** ≈ S/27
-(boleta base S/33.05, IGV S/5.95, Izipay ~S/1.34, renta ~S/0.33,
-OpenAI S/3.40, crumbs S/0.30). After ads: ~S/15 / S/7 / −S/8 at CAC
-S/12 / S/20 / S/35.
-
-Questions for Izipay, if we switch: IPN retries, query API, refund API,
-minimum billing fields, written tarifario, Yape vs card same IPN, 24 h
-session expiry.
-
 ## What this file does not decide
 
 - Accountant’s Paddle booking, exportación, and non-domiciled IGV.
 - Accountant’s Meta-as-import treatment.
 - A/B S/49 after the pixel has data.
 - Nubefact or any billing API.
-- Changing `PLAN.md`. Divergence lives here and in `IMPLEMENTATION.md`.

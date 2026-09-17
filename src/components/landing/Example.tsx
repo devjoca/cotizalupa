@@ -42,7 +42,7 @@ export function Example() {
         <span className="eyebrow">MENOS SUPUESTOS. MEJORES PREGUNTAS.</span>
         <h2>
           Esto es lo que
-          <br />
+          <br />{" "}
           te llevas.
         </h2>
         <p>

@@ -1,37 +1,42 @@
-# cotizalupa
+# CotizaLupa
 
-A minimal TanStack Start app with one route and plain CSS.
+CotizaLupa reviews one quotation at a time: upload, pre-check, payment,
+analysis, and a private report link. The product is still being built in the
+phase order recorded in `IMPLEMENTATION.md`.
+
+## Local development
+
+Requirements: Node 24, pnpm 12, and Docker.
 
 ```bash
 pnpm install
+pnpm dev:infra
+cp -n .env.example .env
+pnpm db:migrate
 pnpm dev
 ```
 
-Edit `src/routes/index.tsx` to get started. Add route files under
-`src/routes`; TanStack Router updates `src/routeTree.gen.ts` for you.
+`dev:infra` starts PostgreSQL on `127.0.0.1:55432` and MinIO on
+`127.0.0.1:59000` (console: `127.0.0.1:59001`). The example environment file
+already contains the matching local-only credentials. Add an OpenAI key only
+when the flow being tested needs a model call.
 
-Build the production app with:
+DB-backed tests use generated databases under `cotizalupa_test`; they never use
+`DATABASE_URL`:
 
 ```bash
-pnpm build
+pnpm test
 ```
 
-## Deploy to Railway
+Stop the services without deleting their volumes:
 
-Railway's Railpack builder detects the project's package manager and package
-scripts automatically.
+```bash
+pnpm dev:infra:down
+```
 
-1. Push this repo to GitHub
-2. Visit https://railway.com/new and create a project from your repo
-3. In the **Variables** tab, add the entries from `.env.example` with their production values
-4. Deploy, then open **Networking** and select **Generate Domain**
+## Deployment
 
-Railpack runs the project's build script and starts the generated Nitro server
-with `node .output/server/index.mjs`. The server handles SSR, server functions,
-API routes, and static assets.
-
-Need a database? Add one from the Railway project canvas, then connect it to the
-app with a Railway reference variable. The variable name and value depend on the
-database service you choose.
-
-
+The deployed app is one persistent Railway service. Configure a Neon
+`DATABASE_URL`, Railway private-bucket S3 variables, `OPENAI_API_KEY`, and the
+optional server-only `SENTRY_DSN` from `.env.example`. Do not reuse production
+resources for development or tests.

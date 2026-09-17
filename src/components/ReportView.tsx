@@ -2,8 +2,8 @@ import type { analyzeFiles } from "../server/analyze";
 
 export type AnalyzeResult = Awaited<ReturnType<typeof analyzeFiles>>;
 
-// Shared by the /analyze validation page and the landing dialog step 3.
-// Plain markup on purpose: prompt-validation scaffolding, not product UI.
+// Used only by the /analyze prompt-validation page. Product reports render on
+// /r/{token} through ReportDocument.
 export function ReportView({ result }: { result: AnalyzeResult }) {
   if (result.status !== "COMPLETED") {
     return (

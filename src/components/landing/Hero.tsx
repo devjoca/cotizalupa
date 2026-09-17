@@ -137,7 +137,7 @@ export function Hero({ onStart }: { onStart: () => void }) {
           Antes del sí,
           <br />
           <span>
-            mira la<br />
+            mira la<br />{" "}
             letra chica.
           </span>
         </h1>

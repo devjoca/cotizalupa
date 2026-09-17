@@ -17,7 +17,7 @@ const FAQS: Array<{ question: string; answer: string }> = [
   {
     question: "¿Necesito compartir mis datos personales?",
     answer:
-      "Puedes ocultar nombres, teléfonos, DNI/RUC y direcciones que no sean necesarios. Conserva el alcance, los montos, fechas y condiciones. En esta demostración, el archivo se selecciona solo en tu dispositivo y no se envía.",
+      "Puedes ocultar nombres, teléfonos, DNI/RUC y direcciones que no sean necesarios. Conserva el alcance, los montos, fechas y condiciones. CotizaLupa usa el archivo solo para generar el reporte y no lo guarda en esta demostración. Cuando el análisis usa IA, el archivo se envía a OpenAI.",
   },
   {
     question: "¿La revisión garantiza que todo está bien?",
@@ -38,7 +38,7 @@ export function Faq() {
         <span className="eyebrow">ANTES DE EMPEZAR</span>
         <h2>
           Las dudas,
-          <br />
+          <br />{" "}
           sobre la mesa.
         </h2>
       </div>

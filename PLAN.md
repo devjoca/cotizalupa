@@ -19,11 +19,16 @@ Principio: lo más simple que funcione. Nada se construye para concurrencia o es
 | IA | `openai` 7.x, Responses API, `store: false`, `json_schema` strict |
 | Tests | Vitest 5 |
 | Modelo | Astra para el análisis. El más barato disponible para el pre-check |
-| Pagos | Izipay SDK Web, tarjeta + Yape |
+| Pagos | Paddle Checkout, pendiente de aceptación escrita del producto |
 | Cola | Postgres, una query de claim |
 | Límites | 10 páginas / 10 imágenes por orden |
-| Errores | Logs de Railway |
-| No | OCR, texto persistido, Redis, workflow engine, vector DB, admin UI, Sentry |
+| Errores | Logs de Railway + Sentry server-only, sin PII ni contenido del documento |
+| No | OCR, texto persistido, Redis, workflow engine, vector DB, admin UI, tracing, replay |
+
+Desarrollo local: `pnpm dev:infra` levanta PostgreSQL 17 y MinIO. Tests de DB
+usan `cotizalupa_test` para crear una base aislada por caso; nunca usan
+`DATABASE_URL`.
+Producción mantiene Neon y Railway Bucket con las mismas interfaces `pg`/S3.
 
 Versiones verificadas en npm el 15 de septiembre de 2026. Node 22 está en maintenance desde octubre 2025; Node 24 es el LTS activo hasta abril 2028. Node 26 pasa a LTS el 27 de octubre de 2026; migrar cuando las deps lo declaren soportado.
 
@@ -39,8 +44,8 @@ Cuenta como una aunque tenga varios ítems, opciones A/B/C, adicionales, anexos 
 
 ```
 CREATE ORDER → UPLOAD → VALIDACIÓN MECÁNICA → PRE-CHECK IA → READY_FOR_PAYMENT
-→ IZIPAY → PAID → CLAIM → ANÁLISIS ASTRA → ZOD → SAVE REPORT + FACTS
-→ COMPLETED → DELETE ORIGINAL ≤ 24 h
+→ PADDLE → PAID → CLAIM → ANÁLISIS ASTRA → ZOD → SAVE REPORT + FACTS
+→ COMPLETED → ORIGINAL DUE → OPS:DRAIN LO ELIMINA
 ```
 
 El pre-check no analiza gaps. Solo protege la unidad comercial y evita cobrar por lo que no podemos procesar.
@@ -95,9 +100,9 @@ Rate limit: contador en memoria por IP, 10 órdenes por hora. Sin Redis. Corre e
 CREATED → UPLOADED → PRECHECKING → READY_FOR_PAYMENT → PAYMENT_PENDING → PAID → PROCESSING → COMPLETED
 
 PRECHECKING        → REJECTED
-READY_FOR_PAYMENT  → EXPIRED           (24 h sin abrir checkout)
-PAYMENT_PENDING    → PAYMENT_FAILED    (puede reintentar)
-PAYMENT_PENDING    → EXPIRED           (24 h sin pagar)
+READY_FOR_PAYMENT  → EXPIRED           (30 días sin pagar; drain manual)
+PAYMENT_PENDING    → PAID | PAYMENT_FAILED (resultado autenticado de Paddle; puede reintentar)
+PAYMENT_PENDING    → EXPIRED           (solo manual tras reconciliar Paddle; nunca por el drain)
 PROCESSING         → PROCESSING_FAILED (3 intentos)
 PROCESSING         → NOT_ANALYZABLE    (el modelo no puede tras el pago)
 PROCESSING_FAILED, NOT_ANALYZABLE → REFUNDED (manual)
@@ -105,17 +110,28 @@ PROCESSING_FAILED, NOT_ANALYZABLE → REFUNDED (manual)
 
 Son valores en la DB y updates condicionales. Sin librería de state machine.
 
-Todo estado terminal setea `delete_after`: `REJECTED` y `EXPIRED` inmediato, `COMPLETED` a 24 h. Un solo barrido borra por `delete_after <= now()`.
+Cada orden nace con `delete_after = created_at + 30 días`. `REJECTED`,
+`EXPIRED`, `COMPLETED` y `REFUNDED` lo adelantan a `now()`. Los fallos pagados
+conservan el límite original para permitir recuperación o reembolso manual.
+Toda transición terminal borra `user_context`; el reporte y `quotation_facts`
+son los únicos resultados de análisis que se conservan.
+El drain solo borra archivos de estados terminales seguros; nunca borra desde
+`PAYMENT_PENDING`, `PAID` o `PROCESSING`. La eliminación física ocurre al
+siguiente `pnpm ops:drain`, no exactamente al vencer la fecha.
 
 Cada `NOT_ANALYZABLE` es un pre-check que falló. Se guarda como caso de eval.
 
 ## Congelar archivos al pagar
 
-Al crear la sesión de Izipay la orden pasa a `PAYMENT_PENDING` y los archivos quedan inmutables. Lo que validamos = lo que cobramos = lo que analizamos. Para cambiar un archivo: nueva orden.
+Al crear la sesión de Paddle la orden pasa a `PAYMENT_PENDING` y los archivos
+quedan inmutables. Lo que validamos = lo que cobramos = lo que analizamos. Para
+cambiar un archivo: nueva orden.
 
 ## Pago
 
-Antes de la transición: firma sobre `payloadHttp`, `code === "00"`, `orderNumber`, monto en céntimos, moneda, `uniqueId` en `payment_events` (UNIQUE, si ya existe responder 200 y terminar).
+Antes de la transición: firma de Paddle, estado exitoso, `transaction_id`, id
+de orden, monto en céntimos y moneda. El id estable del evento entra en
+`payment_events.provider_event_id` (UNIQUE; si ya existe, responder 200 y terminar).
 
 ```sql
 UPDATE orders SET status = 'PAID', paid_at = now()
@@ -123,15 +139,23 @@ WHERE id = $1 AND status = 'PAYMENT_PENDING'
 RETURNING id;
 ```
 
-Cero filas: no pasa nada más. IPN y callback del navegador entran por el mismo camino.
+Cero filas: no pasa nada más. Webhook y retorno del navegador entran por el
+mismo camino verificado.
 
 No persistimos DNI, dirección, tarjeta ni billing. `payment_events.payload` se guarda sin `billing` ni `card`.
 
-Pendiente con Izipay: reintentos del IPN, API de consulta, API de reembolso, campos mínimos de billing.
+`PAYMENT_PENDING` nunca expira solo por antigüedad. El drain lista las órdenes
+de 30 días para reconciliación manual en Paddle. Confirmada pagada → `PAID`;
+confirmada fallida/cancelada/vencida → `PAYMENT_FAILED` o `EXPIRED`; dudosa →
+sin cambio.
 
 ## Procesamiento
 
-Un solo proceso. El handler del IPN, después de responder 200, llama a `processNext()`. Un `setInterval` de 60 s también llama a `processNext()` para recuperar órdenes trabadas y borrar archivos vencidos.
+Un solo proceso. El webhook, después de responder 200, llama a `processNext()`.
+No hay timer. `pnpm ops:drain` es el respaldo manual: expira impagos viejos,
+repara intentos agotados, procesa trabajo recuperable, lista pagos pendientes
+que requieren revisión y borra originales vencidos. Termina con código distinto
+de cero si todavía requiere intervención manual.
 
 ```sql
 UPDATE orders
@@ -153,7 +177,7 @@ RETURNING *;
 
 Commit y después se llama al modelo. Después de 3 intentos: `PROCESSING_FAILED`.
 
-El polling mantiene el compute de Neon encendido. Aceptado como costo del MVP.
+El drain corre a mano una vez al mes y cuando Sentry muestra un fallo operativo.
 
 ## Análisis
 
@@ -167,11 +191,12 @@ Regla del prompt: no generar gaps para llenar el reporte. 0 a 3 gaps fuertes val
 orders
   id uuid pk, status text
   country text default 'PE', currency text default 'PEN', amount_cents integer
-  perspective text, category text, user_context text null, email text null
+  perspective text, category text, moment text, user_context text null, email text null
   report_token_hash text unique
   payment_provider text null, payment_transaction_id text null
   precheck_result jsonb null
-  processing_started_at timestamptz null, delete_after timestamptz null
+  processing_started_at timestamptz null
+  delete_after timestamptz not null default now() + interval '30 days'
   attempts smallint default 0, last_error text null
   refund_requested_at timestamptz null
   fbp, fbc, client_user_agent, client_ip text null
@@ -179,7 +204,7 @@ orders
   created_at, paid_at, completed_at, updated_at
 
 order_files
-  id, order_id, blob_path, mime, size_bytes, sha256, pages, deleted_at
+  id, order_id, position, blob_path, mime, size_bytes, sha256, pages, deleted_at
 
 reports
   id, order_id
@@ -234,11 +259,17 @@ Campo desconocido: `null`. Nunca inventado.
 
 ## Página del reporte
 
-`/r/{token}`. Se busca por `sha256(token)`. Sin pixel de Meta en esta página. Si el usuario dejó email, se le envía el link; si no, se le advierte que lo conserve.
+`/r/{token}`. Se busca por `sha256(token)` y solo renderiza el reporte persistido.
+Sin pixel de Meta en esta página. El envío por email, la captura de email y la
+descarga en PDF quedan diferidos hasta definir ese flujo de producto.
 
 ## Privacidad
 
-Original en el bucket hasta `delete_after`. OpenAI con `store: false`. No se persiste OCR, texto completo, ni conversaciones. Solo `quotation_facts`, `report` y metadata operativa. La política aclara que hay proveedores externos y no promete que todos borren el contenido exactamente a las 24 h.
+El original tiene un límite inicial de 30 días y se elimina en el siguiente
+drain una vez elegible. OpenAI usa `store: false`. No persistimos OCR, texto
+completo ni conversaciones. `user_context` existe solo mientras puede hacer
+falta para analizar o recuperar; se limpia al completar, rechazar, vencer o
+reembolsar. Conservamos `quotation_facts`, el reporte y metadata operativa.
 
 ## SUNAT
 
@@ -248,27 +279,32 @@ Boleta a consumidor final, emitida a mano. DNI/RUC no es requisito del producto.
 
 Sin admin UI. Queries documentadas en `ops/queries.sql`:
 
-- órdenes en `PAYMENT_PENDING` de más de 30 minutos
+- órdenes `READY_FOR_PAYMENT`/`PAYMENT_FAILED` de más de 30 días
+- órdenes en `PAYMENT_PENDING` de más de 30 días para reconciliar, sin update masivo
+- órdenes `PROCESSING` agotadas o trabadas
 - órdenes en `PROCESSING_FAILED` y `NOT_ANALYZABLE`
 - órdenes con `refund_requested_at` sin `REFUNDED`
 - costo por orden en la última semana
 
-Reembolso: manual desde el panel de Izipay, después `UPDATE orders SET status = 'REFUNDED'`.
+Reembolso: manual desde Paddle, después transición condicional a `REFUNDED`.
 
 ## Tests
 
 Dos carpetas, dos comandos.
 
-`pnpm test` (Vitest, determinista, gratis, corre en CI):
+`pnpm test` (Vitest, determinista, gratis; requiere `pnpm dev:infra` para los
+casos DB y el mismo servicio PostgreSQL en CI):
 
 - `>10 pages rejected`, `encrypted pdf rejected`, `fake mime rejected`
 - `payment cannot occur before successful precheck`
 - `files immutable after PAYMENT_PENDING`
-- `IPN with bad signature rejected`, `IPN with wrong amount rejected`
-- `duplicate IPN doesn't duplicate report`
-- `stale PROCESSING order is reclaimed`, `fourth attempt marks PROCESSING_FAILED`
+- `webhook with bad signature rejected`, `webhook with wrong amount rejected`
+- `duplicate webhook doesn't duplicate report`
+- `stale PROCESSING order is reclaimed`, `abandoned third attempt marks PROCESSING_FAILED`
+- `report + COMPLETED is atomic/idempotent`, `active files never enter deletion`
+- `stale PAYMENT_PENDING is reported, never expired automatically`
 - `invalid model output counts as attempt`
-- `terminal states set delete_after`
+- `terminal deletion eligibility and active-state exclusion`
 
 `pnpm eval` (llama al modelo, cuesta dinero, corre a mano):
 
@@ -292,7 +328,8 @@ Sin estimaciones. El orden importa, el tiempo no.
 
 1. Core: TanStack Start, Neon/Drizzle, bucket, upload, validación mecánica, órdenes, pre-check.
 2. Producto: Astra → Zod → reporte, `quotation_facts`, `processNext()`, página `/r/{token}`.
-3. Money: Izipay sandbox, idempotencia, Yape y tarjeta, callbacks. Meta CAPI solo si hace falta para adquisición.
+3. Money: Paddle sandbox, idempotencia, webhook + retorno del navegador. Meta CAPI solo si hace falta para adquisición.
 4. Producción: `delete_after`, reintentos, política de privacidad, boleta manual, prueba con dinero real y reembolso manual.
 
-Las cuatro preguntas a Izipay se mandan antes de empezar la fase 1.
+Las preguntas de aceptación del producto se resuelven con Paddle antes de
+escribir el adapter de pagos.

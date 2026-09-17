@@ -10,6 +10,7 @@ import {
   type AnalysisInputFile,
 } from "./ai";
 import { analysisGuard } from "./analysisGuard";
+import { captureOperationalError } from "./monitoring";
 import {
   MechanicalValidationError,
   validateAnalysisFiles,
@@ -24,6 +25,8 @@ import {
   MAX_IMAGE_FILES,
   MAX_ORDER_BYTES,
 } from "#/lib/uploadLimits";
+import { getDb } from "#/db/client";
+import { createCompletedDemoReport } from "#/db/orders";
 
 const FilesInput = z.strictObject({
   files: z
@@ -59,86 +62,137 @@ const FilesInput = z.strictObject({
   context: ReviewContextInputSchema,
 });
 
+async function runAnalysis(data: z.infer<typeof FilesInput>) {
+  const clientIp = getRequestIP({ xForwardedFor: true }) ?? "unknown";
+  if (!analysisGuard.takeRateLimit(clientIp)) {
+    return {
+      status: "RATE_LIMITED" as const,
+      message:
+        "Alcanzaste el límite de 10 análisis por hora. Inténtalo más tarde.",
+    };
+  }
+
+  let files: AnalysisInputFile[];
+  try {
+    files = await validateAnalysisFiles(data.files);
+  } catch (error) {
+    if (error instanceof MechanicalValidationError) {
+      return {
+        status: "INVALID_UPLOAD" as const,
+        code: error.code,
+        message: error.message,
+      };
+    }
+    throw error;
+  }
+
+  const release = analysisGuard.tryAcquire();
+  if (!release) {
+    return {
+      status: "BUSY" as const,
+      message:
+        "Hay varias revisiones en curso. Espera un momento e inténtalo de nuevo.",
+    };
+  }
+
+  try {
+    const result = await analyzeQuotation(files, {
+      context: data.context,
+      perspective: data.perspective,
+    });
+    if (!isAnalyzable(result.analysis)) {
+      return {
+        status: "DOCUMENT_REJECTED" as const,
+        message:
+          result.analysis.document.rejection_reason ??
+          "No podemos analizar este documento como una sola cotización.",
+      };
+    }
+    return {
+      status: "COMPLETED" as const,
+      analysis: result.analysis,
+      usage: result.usage,
+      latency_ms: result.latency_ms,
+      model: result.model,
+      prompt_version: result.prompt_version,
+    };
+  } catch (error) {
+    if (error instanceof AiRefused) {
+      captureOperationalError("analysis_refused", error);
+      return {
+        status: "AI_REFUSED" as const,
+        message: "El modelo no pudo revisar el contenido de este documento.",
+      };
+    }
+    if (error instanceof AiInvalidOutput) {
+      captureOperationalError("analysis_invalid_output", error);
+      return {
+        status: "MODEL_INVALID_OUTPUT" as const,
+        message: "El análisis no produjo un reporte válido. Inténtalo de nuevo.",
+      };
+    }
+    if (error instanceof AiRequestFailed) {
+      captureOperationalError("analysis_provider_failure", error, {
+        retryable: error.retryable,
+        status: error.status,
+      });
+      return {
+        status: "PROVIDER_FAILURE" as const,
+        retryable: error.retryable,
+        message: error.retryable
+          ? "El servicio de análisis no está disponible por el momento. Inténtalo de nuevo."
+          : "El servicio de análisis no está configurado correctamente.",
+      };
+    }
+    captureOperationalError("analysis_unexpected_failure", error);
+    throw error;
+  } finally {
+    release();
+  }
+}
+
 export const analyzeFiles = createServerFn({ method: "POST" })
   .validator(FilesInput)
+  .handler(({ data }) => runAnalysis(data));
+
+export const analyzeAndPersistReport = createServerFn({ method: "POST" })
+  .validator(FilesInput)
   .handler(async ({ data }) => {
-    const clientIp = getRequestIP({ xForwardedFor: true }) ?? "unknown";
-    if (!analysisGuard.takeRateLimit(clientIp)) {
-      return {
-        status: "RATE_LIMITED" as const,
-        message:
-          "Alcanzaste el límite de 10 análisis por hora. Inténtalo más tarde.",
-      };
-    }
+    const analyzed = await runAnalysis(data);
+    if (analyzed.status !== "COMPLETED") return analyzed;
 
-    let files: AnalysisInputFile[];
-    try {
-      files = await validateAnalysisFiles(data.files);
-    } catch (error) {
-      if (error instanceof MechanicalValidationError) {
-        return {
-          status: "INVALID_UPLOAD" as const,
-          code: error.code,
-          message: error.message,
-        };
-      }
-      throw error;
-    }
-
-    const release = analysisGuard.tryAcquire();
-    if (!release) {
+    const { quotation_facts, ...report } = analyzed.analysis;
+    if (!quotation_facts) {
+      captureOperationalError("demo_report_missing_facts");
       return {
-        status: "BUSY" as const,
-        message:
-          "Hay varias revisiones en curso. Espera un momento e inténtalo de nuevo.",
+        status: "PERSISTENCE_FAILURE" as const,
+        message: "No pudimos preparar el reporte. Inténtalo de nuevo.",
       };
     }
 
     try {
-      const result = await analyzeQuotation(files, {
-        context: data.context,
+      const saved = await createCompletedDemoReport(getDb(), {
         perspective: data.perspective,
+        category: data.context.service_category,
+        moment: data.context.moment,
+        amountCents: data.context.approximate_amount_cents,
+        result: report,
+        quotationFacts: quotation_facts,
+        model: analyzed.model,
+        promptVersion: analyzed.prompt_version,
+        inputTokens: analyzed.usage.input_tokens,
+        outputTokens: analyzed.usage.output_tokens,
+        latencyMs: analyzed.latency_ms,
       });
-      if (!isAnalyzable(result.analysis)) {
-        return {
-          status: "DOCUMENT_REJECTED" as const,
-          message:
-            result.analysis.document.rejection_reason ??
-            "No podemos analizar este documento como una sola cotización.",
-        };
-      }
       return {
         status: "COMPLETED" as const,
-        analysis: result.analysis,
-        usage: result.usage,
-        latency_ms: result.latency_ms,
-        model: result.model,
-        prompt_version: result.prompt_version,
+        report_token: saved.reportToken,
       };
     } catch (error) {
-      if (error instanceof AiRefused) {
-        return {
-          status: "AI_REFUSED" as const,
-          message: "El modelo no pudo revisar el contenido de este documento.",
-        };
-      }
-      if (error instanceof AiInvalidOutput) {
-        return {
-          status: "MODEL_INVALID_OUTPUT" as const,
-          message: "El análisis no produjo un reporte válido. Inténtalo de nuevo.",
-        };
-      }
-      if (error instanceof AiRequestFailed) {
-        return {
-          status: "PROVIDER_FAILURE" as const,
-          retryable: error.retryable,
-          message: error.retryable
-            ? "El servicio de análisis no está disponible por el momento. Inténtalo de nuevo."
-            : "El servicio de análisis no está configurado correctamente.",
-        };
-      }
-      throw error;
-    } finally {
-      release();
+      captureOperationalError("demo_report_persist_failed", error);
+      return {
+        status: "PERSISTENCE_FAILURE" as const,
+        message: "No pudimos guardar el reporte. Inténtalo de nuevo.",
+      };
     }
   });

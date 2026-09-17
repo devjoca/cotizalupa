@@ -18,6 +18,10 @@ changes — do not append a second account.
 | `pg` | 8.x | 8.23.0 | — |
 | `unpdf` / `file-type` | 1.x / 22 | 1.8.1 / 22.1.0 | — |
 | `openai` | 7.x | 7.15.0 | — |
+| Local PostgreSQL | (not specified) | `postgres:17-alpine` | Local dev and isolated-database lifecycle tests use the same server/driver shape as Neon |
+| Local bucket | (not specified) | `quay.io/minio/minio:latest` | Local S3-compatible bucket; Railway remains the deployed bucket |
+| Sentry Node | (approved exception) | 10.74.0 | Manual server error capture only; no tracing, replay, request bodies, or PII |
+| AWS S3 client | (bucket adapter) | 3.1130.0 | Railway Buckets expose an S3-compatible API |
 | Vitest | 5 | ^5.0.1 (lockfile: 5.0.1) | exact pin fought pnpm 12's 24h minimum-release-age policy on publish day (D3) |
 
 Rule going forward: versions float within PLAN's majors unless a
@@ -95,7 +99,7 @@ the launch willingness-to-pay (~$12 at 3.40). Live landing shows S/39.
 CAPI is needed (Purchase only on `PAID`). Do not change the ticket in
 code without updating this decision and `docs/pricing.md`.
 
-### D8 — Paddle first; Izipay is an adapter, not the product (2026-09-15)
+### D8 — Paddle is the MVP payment rail (2026-09-15, updated 2026-09-16)
 MVP hypothesis is “will someone pay ~$12?”, not “can we operate Peruvian
 payments.” Pending written product acceptance, checkout is Paddle (MoR):
 pre-check → Paddle → webhook `PAID` → analyze. We still have renta and
@@ -103,17 +107,16 @@ the monthly 621; we do not emit a boleta per consumer in this path.
 Exportación de servicios and IGV on a non-domiciled MoR fee are
 accountant questions, not assumptions.
 
-Izipay (PLAN’s rail) is deferred. Switch back when people pay and we
-optimize Peru, or when no-Yape kills Purchase conversion. Payments code
-must stay provider-agnostic: verify event, match order/amount/currency,
-idempotent `provider_event_id`, `PAID` only from `PAYMENT_PENDING`. Do
-not bake `payloadHttp` / `code === "00"` / Yape into order logic.
-
-PLAN.md is not rewritten. Economics and the Paddle email live in
+Payments code stays provider-agnostic: verify the Paddle event, match
+order/amount/currency, deduplicate `provider_event_id`, and allow `PAID` only
+from `PAYMENT_PENDING`. Economics and the acceptance email live in
 `docs/pricing.md`.
 
 ### D9 — Free POC uses one AI pass; payment remains blocked (2026-09-16)
-The free POC runs submit → result with no payment and no AI pre-payment gate.
+The free POC runs submit → persisted `/r/{token}` report with no payment and no
+AI pre-payment gate. A successful synchronous analysis atomically creates a
+terminal demo order and its report, then returns the raw token only to the
+browser for navigation. It persists neither the original nor the user's concern.
 The backend still rejects mechanically invalid uploads before model spend: one
 PDF of at most 10 pages, or 1–10 JPG/PNG images, 25 MiB combined, real MIME,
 readable/unencrypted PDF, server-computed SHA-256. The single Astra pass checks
@@ -134,13 +137,53 @@ Spend protection stays in memory to preserve the one-process design: 10
 requests per IP per hour and at most two simultaneous model calls. These limits
 reset on deploy and are intentionally not distributed.
 
+### D10 — Manual recovery, 30-day ceiling, minimal Sentry (2026-09-16)
+There is no interval. The phase 3 webhook will call `processNext()` after
+responding 200; `pnpm ops:drain` is the manual backstop run monthly or after a
+Sentry alert. It expires old unpaid orders, repairs exhausted processing,
+drains claimable work, lists stale payments for manual Paddle reconciliation,
+lists every existing paid analysis failure, deletes due originals, and exits
+nonzero when manual work remains. It never guesses that a pending payment failed.
+
+Every order starts with a 30-day `delete_after`. Safe terminal states shorten
+the deadline to now; paid failures retain the original ceiling for recovery or
+refund. Every terminal transition clears `user_context`. The sweep only accepts
+terminal statuses, so a bad date cannot delete a pending or processing original.
+Physical deletion occurs on the next manual drain after the deadline.
+
+Sentry is the one approved infrastructure exception. The server SDK captures
+sanitized operational errors only. Default integrations, PII, request data,
+breadcrumbs, tracing, and replay are disabled.
+
+### D11 — DB recovery boundary and local services (2026-09-16)
+Docker PostgreSQL applies the generated migration in a unique database per test
+and executes the same `pg` driver and `FOR UPDATE SKIP LOCKED` claim SQL as
+Neon. Docker Compose also provides MinIO for local bucket integration. Report
+insertion and `PROCESSING → COMPLETED` now share one SQL statement, retries
+reuse the unique report row, and the manual drain closes a crashed third
+attempt. Bucket reads verify size and SHA-256 before analysis; deletion marks
+`deleted_at` only after the bucket acknowledges the delete.
+
+### D12 — Persisted report page (2026-09-16)
+
+`/r/{token}` hashes the raw URL token on the server, validates the stored report
+against `AnalysisSchema`, and renders only persisted report data. Invalid,
+unfinished, and unavailable reports have separate es-PE states. The page is
+`noindex`, contains no Meta pixel, and never stores the raw token. Email capture,
+email delivery, and PDF download remain undecided and are not part of this phase.
+
 ## Phase status
 
 - [x] 0. Scaffold (this file's baseline)
-- [ ] 1. Core: Neon/Drizzle live, bucket, upload, mechanical validation, orders
-- [ ] 2. Producto: Astra → Zod → report, `quotation_facts`, `processNext()`, `/r/{token}`
-- [ ] 3. Money: payment adapter (Paddle first, pending written yes), idempotency, webhooks. Meta CAPI needed (Purchase on `PAID` only) — acquisition is ads (D7, D8)
-- [ ] 4. Producción: `delete_after` sweep, retries, privacy policy, real-money test + refund path
+- [ ] 1. Core: DB layer, generated migration, Docker PostgreSQL lifecycle tests, bucket
+  read/delete adapter, and mechanical validation are built. Still open:
+  `pnpm db:migrate` on dev, presigned upload, persisted order flow, pre-check
+- [ ] 2. Producto: Astra → Zod, `processNext()`, and persisted `/r/{token}`
+  rendering are built. Still open: wiring the paid order flow
+- [ ] 3. Money: Paddle adapter, verified idempotent webhook/return path, and
+  checkout file freeze. Meta CAPI is still needed (`Purchase` on `PAID` only).
+- [ ] 4. Producción: sweep/retry mechanisms are built. Still open: deployment
+  runbook validation, privacy policy, and sandbox-to-live charge/refund sign-off.
 
 ## Open questions
 
@@ -152,6 +195,3 @@ vs AI/document-upload.
 Accountant, before first live charge: CotizaLupa→Paddle booking;
 exportación de servicios (four SUNAT conditions, do not assume);
 non-domiciled IGV on the MoR fee (2026 procedure).
-
-Izipay only if we switch: IPN retries, query API, refund API, minimum
-billing fields, tarifario, Yape vs card, 24 h expiry.

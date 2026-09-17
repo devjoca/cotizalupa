@@ -3,6 +3,7 @@ import {
   MAX_ORDER_BYTES,
   isAllowedMime,
 } from "#/lib/uploadLimits";
+import { OTHER_CATEGORY } from "#/lib/reviewContext";
 
 // Demo review-flow state. The dialog is cliente-only (iteration 1): the role is
 // fixed, so the reducer owns step, fields, file label, and error.
@@ -43,8 +44,32 @@ export type FlowAction =
 export const MISSING_FILE_ERROR =
   "Selecciona una cotización para recorrer la demostración.";
 
+export const MISSING_CATEGORY_ERROR = "Elige qué estás cotizando.";
+export const MISSING_OTHER_ERROR = "Describe el servicio.";
+export const MISSING_MOMENT_ERROR = "Elige en qué momento estás.";
+
 export const INVALID_FILE_ERROR =
   "Elige un PDF o hasta 10 imágenes JPG/PNG, no vacíos y de hasta 25 MB en total.";
+
+export type MissingStepTwoField = "category" | "other" | "file" | "moment";
+
+export function missingStepTwoField(
+  state: FlowFields,
+  hasFile: boolean,
+): MissingStepTwoField | null {
+  if (!state.category) return "category";
+  if (state.category === OTHER_CATEGORY && !state.other.trim()) return "other";
+  if (!hasFile) return "file";
+  if (!state.moment) return "moment";
+  return null;
+}
+
+function missingStepTwoError(field: MissingStepTwoField): string {
+  if (field === "category") return MISSING_CATEGORY_ERROR;
+  if (field === "other") return MISSING_OTHER_ERROR;
+  if (field === "moment") return MISSING_MOMENT_ERROR;
+  return MISSING_FILE_ERROR;
+}
 
 export function flowReducer(state: FlowState, action: FlowAction): FlowState {
   switch (action.type) {
@@ -63,8 +88,9 @@ export function flowReducer(state: FlowState, action: FlowAction): FlowState {
     case "next":
       if (state.step === 1) return { ...state, step: 2, error: null };
       if (state.step === 2) {
-        if (!action.hasFile)
-          return { ...state, error: MISSING_FILE_ERROR };
+        const missing = missingStepTwoField(state, action.hasFile);
+        if (missing)
+          return { ...state, error: missingStepTwoError(missing) };
         return { ...state, step: 3, error: null };
       }
       return state;
