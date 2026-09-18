@@ -76,12 +76,7 @@ export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogPro
   }, [open, state.step]);
 
   function addFiles(picked: readonly File[]) {
-    const replacingPdf =
-      files.length === 1 &&
-      /\.pdf$/i.test(files[0]!.name) &&
-      picked.length === 1 &&
-      /\.pdf$/i.test(picked[0]!.name);
-    const nextFiles = replacingPdf ? [...picked] : [...files, ...picked];
+    const nextFiles = [...files, ...picked];
     const result = validatePickedFiles(nextFiles);
     if (fileInputRef.current) fileInputRef.current.value = "";
     if ("error" in result) {
@@ -178,19 +173,12 @@ export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogPro
   }
 
   const showOther = state.category === OTHER_CATEGORY;
-  const hasPdf = files.length === 1 && /\.pdf$/i.test(files[0]!.name);
   const uploadTitle =
-    files.length === 0
-      ? "Sube tu cotización"
-      : hasPdf
-        ? "Cambia el PDF"
-        : "Agrega otra imagen";
+    files.length === 0 ? "Sube tu cotización" : "Agrega más archivos";
   const uploadPrompt =
     files.length === 0
-      ? "Selecciona o arrastra un archivo"
-      : hasPdf
-        ? "Selecciona o arrastra otro PDF"
-        : "Selecciona o arrastra más imágenes";
+      ? "Selecciona o arrastra archivos"
+      : "Selecciona o arrastra más archivos";
 
   return (
     <dialog
@@ -302,7 +290,7 @@ export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogPro
                 <span className="upload-icon">↥</span>
                 <strong>{uploadTitle}</strong>
                 <span id="file-label">{uploadPrompt}</span>
-                <span>1 PDF o hasta 10 imágenes · máximo 25 MB en total</span>
+                <span>Hasta 5 archivos PDF, JPG o PNG · máximo 25 MB en total</span>
                 <input
                   type="file"
                   multiple
@@ -344,8 +332,7 @@ export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogPro
                 Puedes ocultar nombres, teléfonos, DNI/RUC y direcciones. El
                 archivo se usa solo para generar el reporte y CotizaLupa no lo
                 guarda en esta demo. Al generar el reporte, enviamos el archivo y el
-                contexto a OpenAI. Conservamos el reporte y los datos extraídos.
-                OpenAI puede conservar datos según su configuración y sus políticas.
+                contexto a OpenAI con almacenamiento desactivado. Conservamos el reporte y los datos extraídos.
                 Consulta la <a href="/privacidad" target="_blank" rel="noreferrer">política de privacidad</a>
                 {" "}y los <a href="/terminos" target="_blank" rel="noreferrer">términos de uso</a>.
               </p>
@@ -430,7 +417,7 @@ export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogPro
                 <br />
                 {disabled
                   ? "La generación de reportes está deshabilitada."
-                  : "Al generar el reporte, enviamos el archivo y el contexto a OpenAI para analizarlos con IA. CotizaLupa no guarda el archivo original ni tu preocupación escrita; conserva el reporte y los datos extraídos."}
+                  : "Al generar el reporte, enviamos el archivo y el contexto a OpenAI para analizarlos con IA, con almacenamiento desactivado. CotizaLupa no guarda el archivo original ni tu preocupación escrita; conserva el reporte y los datos extraídos."}
               </div>
               <button
                 type="button"

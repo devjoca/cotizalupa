@@ -1,5 +1,6 @@
 import {
   MAX_ORDER_BYTES,
+  extensionToMime,
   type AllowedMime,
   isAllowedMime,
 } from "./uploadLimits";
@@ -13,10 +14,7 @@ export type UploadFile = {
 function mimeFromFile(file: File): AllowedMime | null {
   if (isAllowedMime(file.type)) return file.type;
   if (file.type !== "") return null;
-  if (/\.pdf$/i.test(file.name)) return "application/pdf";
-  if (/\.jpe?g$/i.test(file.name)) return "image/jpeg";
-  if (/\.png$/i.test(file.name)) return "image/png";
-  return null;
+  return extensionToMime(file.name);
 }
 
 // File → base64 payload for the analyze server fn. The server re-validates

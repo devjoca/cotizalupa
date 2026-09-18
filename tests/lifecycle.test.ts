@@ -94,6 +94,18 @@ describe("order lifecycle", () => {
     expect(out?.deleteAfter).toBeInstanceOf(Date);
   });
 
+  it("stores amounts beyond the 32-bit range", async () => {
+    const order = await createOrder(db, {
+      reportTokenHash: hashReportToken(newReportToken()),
+      amountCents: 99_999_999_999,
+    });
+    const [stored] = await db
+      .select()
+      .from(orders)
+      .where(eq(orders.id, order.id));
+    expect(stored?.amountCents).toBe(99_999_999_999);
+  });
+
   it("report lookup finds the order by token hash only", async () => {
     const token = newReportToken();
     const order = await createOrder(db, {

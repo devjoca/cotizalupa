@@ -1,6 +1,7 @@
 import {
-  MAX_IMAGE_FILES,
   MAX_ORDER_BYTES,
+  MAX_ORDER_FILES,
+  extensionToMime,
   isAllowedMime,
 } from "#/lib/uploadLimits";
 import { OTHER_CATEGORY } from "#/lib/reviewContext";
@@ -49,7 +50,7 @@ export const MISSING_OTHER_ERROR = "Describe el servicio.";
 export const MISSING_MOMENT_ERROR = "Elige en qué momento estás.";
 
 export const INVALID_FILE_ERROR =
-  "Elige un PDF o hasta 10 imágenes JPG/PNG, no vacíos y de hasta 25 MB en total.";
+  "Elige hasta 5 archivos PDF, JPG o PNG, no vacíos y de hasta 25 MB en total.";
 
 export type MissingStepTwoField = "category" | "other" | "file" | "moment";
 
@@ -106,19 +107,12 @@ interface PickedFile {
 export function validatePickedFiles(
   files: readonly PickedFile[] | null | undefined,
 ): { fileName: string } | { error: string } {
-  if (!files?.length || files.length > MAX_IMAGE_FILES)
+  if (!files?.length || files.length > MAX_ORDER_FILES)
     return { error: INVALID_FILE_ERROR };
 
   let totalBytes = 0;
-  let pdfs = 0;
   for (const file of files) {
-    const extensionMime = /\.pdf$/i.test(file.name)
-      ? "application/pdf"
-      : /\.jpe?g$/i.test(file.name)
-        ? "image/jpeg"
-        : /\.png$/i.test(file.name)
-          ? "image/png"
-          : null;
+    const extensionMime = extensionToMime(file.name);
     const mime = file.type === "" ? extensionMime : file.type;
     if (
       !extensionMime ||
@@ -129,26 +123,14 @@ export function validatePickedFiles(
       return { error: INVALID_FILE_ERROR };
     if (file.size === 0) return { error: INVALID_FILE_ERROR };
     totalBytes += file.size;
-    if (mime === "application/pdf") pdfs += 1;
   }
 
-  if (
-    totalBytes > MAX_ORDER_BYTES ||
-    pdfs > 1 ||
-    (pdfs === 1 && files.length > 1)
-  )
-    return { error: INVALID_FILE_ERROR };
+  if (totalBytes > MAX_ORDER_BYTES) return { error: INVALID_FILE_ERROR };
 
   return {
     fileName:
       files.length === 1
         ? files[0]!.name
-        : `${files.length} imágenes seleccionadas`,
+        : `${files.length} archivos seleccionados`,
   };
-}
-
-export function validatePickedFile(
-  file: PickedFile | null | undefined,
-): { fileName: string } | { error: string } {
-  return validatePickedFiles(file ? [file] : file);
 }

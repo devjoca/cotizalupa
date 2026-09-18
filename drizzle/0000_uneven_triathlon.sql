@@ -16,7 +16,7 @@ CREATE TABLE "orders" (
 	"status" text NOT NULL,
 	"country" text DEFAULT 'PE' NOT NULL,
 	"currency" text DEFAULT 'PEN' NOT NULL,
-	"amount_cents" integer,
+	"amount_cents" bigint,
 	"perspective" text,
 	"category" text,
 	"moment" text,

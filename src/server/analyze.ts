@@ -23,8 +23,7 @@ import {
 } from "#/lib/schemas";
 import {
   MAX_BASE64_LENGTH,
-  MAX_IMAGE_FILES,
-  MAX_ORDER_BYTES,
+  MAX_ORDER_FILES,
 } from "#/lib/uploadLimits";
 import { getDb } from "#/db/client";
 import { createCompletedDemoReport } from "#/db/orders";
@@ -39,26 +38,7 @@ const FilesInput = z.strictObject({
       }),
     )
     .min(1)
-    .max(MAX_IMAGE_FILES)
-    .superRefine((files, context) => {
-      const estimatedDecodedBytes = files.reduce(
-        (total, file) =>
-          total +
-          Math.floor((file.dataBase64.length * 3) / 4) -
-          (file.dataBase64.endsWith("==")
-            ? 2
-            : file.dataBase64.endsWith("=")
-              ? 1
-              : 0),
-        0,
-      );
-      if (estimatedDecodedBytes > MAX_ORDER_BYTES) {
-        context.addIssue({
-          code: "custom",
-          message: "Los archivos superan el máximo total de 25 MB.",
-        });
-      }
-    }),
+    .max(MAX_ORDER_FILES),
   perspective: PerspectiveSchema.default("customer"),
   context: ReviewContextInputSchema,
 });

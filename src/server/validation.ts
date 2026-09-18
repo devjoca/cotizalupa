@@ -5,9 +5,10 @@ import { getDocumentProxy } from "unpdf";
 
 import {
   MAX_BASE64_LENGTH,
-  MAX_IMAGE_FILES,
   MAX_ORDER_BYTES,
+  MAX_ORDER_FILES,
   MAX_PDF_PAGES,
+  mimeToExtension,
   type AllowedMime,
   isAllowedMime,
 } from "#/lib/uploadLimits";
@@ -34,18 +35,16 @@ export type MechanicalValidationCode =
   | "ORDER_TOO_LARGE"
   | "UNSUPPORTED_TYPE"
   | "MIME_MISMATCH"
-  | "MIXED_FILE_TYPES"
   | "INVALID_PDF"
   | "PDF_TOO_LONG";
 
 const MESSAGES: Record<MechanicalValidationCode, string> = {
-  INVALID_FILE_COUNT: "Sube un PDF o entre 1 y 10 imágenes.",
+  INVALID_FILE_COUNT: "Sube entre 1 y 5 archivos PDF, JPG o PNG.",
   INVALID_BASE64: "No se pudo leer uno de los archivos.",
   EMPTY_FILE: "Uno de los archivos está vacío.",
   ORDER_TOO_LARGE: "Los archivos superan el máximo total de 25 MB.",
   UNSUPPORTED_TYPE: "Solo aceptamos archivos PDF, JPG o PNG.",
   MIME_MISMATCH: "El contenido de un archivo no coincide con su tipo declarado.",
-  MIXED_FILE_TYPES: "Sube un solo PDF o un grupo de imágenes, sin mezclarlos.",
   INVALID_PDF: "El PDF está dañado, cifrado o protegido con contraseña.",
   PDF_TOO_LONG: "El PDF supera el máximo de 10 páginas.",
 };
@@ -60,27 +59,10 @@ export class MechanicalValidationError extends Error {
   }
 }
 
-function isBase64Character(code: number): boolean {
-  return (
-    (code >= 48 && code <= 57) ||
-    (code >= 65 && code <= 90) ||
-    (code >= 97 && code <= 122) ||
-    code === 43 ||
-    code === 47
-  );
-}
-
+// Strict enough to reject garbage before Buffer silently drops it; the exact
+// byte size is enforced after decoding.
 function isValidBase64(value: string): boolean {
-  if (value.length % 4 !== 0) return false;
-  const padding = value.endsWith("==") ? 2 : value.endsWith("=") ? 1 : 0;
-  const contentLength = value.length - padding;
-  for (let index = 0; index < contentLength; index += 1) {
-    if (!isBase64Character(value.charCodeAt(index))) return false;
-  }
-  for (let index = contentLength; index < value.length; index += 1) {
-    if (value.charCodeAt(index) !== 61) return false;
-  }
-  return true;
+  return value.length % 4 === 0 && /^[A-Za-z0-9+/]*={0,2}$/.test(value);
 }
 
 function decodeBase64(value: string): Buffer {
@@ -112,15 +94,13 @@ async function pdfPages(buffer: Buffer): Promise<number> {
 }
 
 function safeAttachmentName(mime: AllowedMime, index: number): string {
-  if (mime === "application/pdf") return "cotizacion.pdf";
-  const extension = mime === "image/jpeg" ? "jpg" : "png";
-  return `cotizacion-${index + 1}.${extension}`;
+  return `cotizacion-${index + 1}.${mimeToExtension(mime)}`;
 }
 
 export async function validateAnalysisFiles(
   uploads: readonly AnalysisUpload[],
 ): Promise<ValidatedAnalysisFile[]> {
-  if (uploads.length === 0 || uploads.length > MAX_IMAGE_FILES) {
+  if (uploads.length === 0 || uploads.length > MAX_ORDER_FILES) {
     throw new MechanicalValidationError("INVALID_FILE_COUNT");
   }
 
@@ -152,13 +132,6 @@ export async function validateAnalysisFiles(
       throw new MechanicalValidationError("MIME_MISMATCH");
     }
     decoded.push({ upload, buffer, mime: detected.mime });
-  }
-
-  const pdfCount = decoded.filter(
-    ({ mime }) => mime === "application/pdf",
-  ).length;
-  if (pdfCount > 1 || (pdfCount === 1 && decoded.length > 1)) {
-    throw new MechanicalValidationError("MIXED_FILE_TYPES");
   }
 
   return Promise.all(

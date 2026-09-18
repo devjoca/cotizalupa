@@ -12,6 +12,7 @@ import {
 } from "#/db/orders";
 import { orders } from "#/db/schema";
 import { drainOperations, processNext } from "#/server/process";
+import { InvalidOrderData } from "#/server/storage";
 import { MOMENTS } from "#/lib/reviewContext";
 import { eq } from "drizzle-orm";
 import { setupTestDb } from "./db";
@@ -97,6 +98,63 @@ describe("processNext", () => {
         concern: "Confirmar el plazo",
       },
     });
+  });
+
+  it("fails fast on incomplete order context instead of retrying", async () => {
+    const order = await createOrder(db, {
+      reportTokenHash: hashReportToken(newReportToken()),
+    });
+    await transition(db, order.id, "CREATED", "PAID", { paidAt: new Date() });
+    const analyze = vi.fn();
+
+    expect(
+      await processNext({
+        db,
+        analyze,
+        loadFiles: async () => [
+          {
+            name: "cotizacion-1.pdf",
+            mime: "application/pdf",
+            dataBase64: "aGVsbG8=",
+          },
+        ],
+      }),
+    ).toEqual({ status: "PROCESSING_FAILED", orderId: order.id });
+
+    expect(analyze).not.toHaveBeenCalled();
+    const [stored] = await db
+      .select()
+      .from(orders)
+      .where(eq(orders.id, order.id));
+    expect(stored).toMatchObject({
+      status: "PROCESSING_FAILED",
+      lastError: "order_data_invalid",
+    });
+  });
+
+  it("fails fast on invalid stored files instead of retrying", async () => {
+    const order = await createOrder(db, {
+      reportTokenHash: hashReportToken(newReportToken()),
+      perspective: "customer",
+      category: "Diseño gráfico",
+      moment: MOMENTS[0],
+    });
+    await transition(db, order.id, "CREATED", "PAID", { paidAt: new Date() });
+    const analyze = vi.fn(async () => {
+      throw new Error("must not be called");
+    });
+
+    expect(
+      await processNext({
+        db,
+        analyze,
+        loadFiles: async () => {
+          throw new InvalidOrderData("order has no files");
+        },
+      }),
+    ).toEqual({ status: "PROCESSING_FAILED", orderId: order.id });
+
+    expect(analyze).not.toHaveBeenCalled();
   });
 
   it("keeps existing paid failures visible to the manual drain", async () => {

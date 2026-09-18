@@ -24,7 +24,11 @@ import {
   type AnalysisResult,
 } from "./ai";
 import { captureOperationalError } from "./monitoring";
-import { loadAnalysisFiles, sweepDueOriginals } from "./storage";
+import {
+  InvalidOrderData,
+  loadAnalysisFiles,
+  sweepDueOriginals,
+} from "./storage";
 
 type ProcessDependencies = {
   db?: Db;
@@ -48,7 +52,7 @@ function contextFor(order: Awaited<ReturnType<typeof claimNext>>): {
   const perspective = PerspectiveSchema.parse(order.perspective ?? "customer");
   const moment = MOMENTS.find((value) => value === order.moment);
   if (!order.category || !moment) {
-    throw new Error("order analysis context is incomplete");
+    throw new InvalidOrderData("order analysis context is incomplete");
   }
   return {
     perspective,
@@ -102,6 +106,16 @@ export async function processNext(
     if (!saved) throw new Error("order left PROCESSING before completion");
     return { status: "COMPLETED", orderId: order.id };
   } catch (error) {
+    // Deterministic data errors (missing context, missing/corrupt stored
+    // files) never heal on retry: fail the order now instead of burning the
+    // remaining attempts across drains.
+    if (error instanceof InvalidOrderData) {
+      captureOperationalError("order_data_invalid", error, {
+        order_id: order.id,
+      });
+      await failProcessing(db, order.id, "order_data_invalid");
+      return { status: "PROCESSING_FAILED", orderId: order.id };
+    }
     const code = failureCode(error);
     captureOperationalError(code, error, {
       order_id: order.id,

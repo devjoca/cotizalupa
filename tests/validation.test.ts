@@ -28,9 +28,31 @@ describe("mechanical analysis validation", () => {
       upload(onePagePdf, "application/pdf", "quote.pdf"),
     ]);
     expect(result).toMatchObject({
-      name: "cotizacion.pdf",
+      name: "cotizacion-1.pdf",
       mime: "application/pdf",
       pages: 1,
+    });
+  });
+
+  it("accepts several PDFs and mixed PDF/image uploads up to five files", async () => {
+    const results = await validateAnalysisFiles([
+      upload(onePagePdf, "application/pdf", "a.pdf"),
+      upload(onePagePdf, "application/pdf", "b.pdf"),
+      upload(png),
+    ]);
+    expect(results.map((file) => file.name)).toEqual([
+      "cotizacion-1.pdf",
+      "cotizacion-2.pdf",
+      "cotizacion-3.png",
+    ]);
+  });
+
+  it("rejects a sixth file", async () => {
+    const six = Array.from({ length: 6 }, () => upload(png));
+    await expect(validateAnalysisFiles(six)).rejects.toMatchObject<
+      Partial<MechanicalValidationError>
+    >({
+      code: "INVALID_FILE_COUNT",
     });
   });
 

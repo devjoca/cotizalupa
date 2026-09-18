@@ -194,6 +194,27 @@ support/privacy requests and Jose Carlos Pereyra Leon as the operator. Verify
 the mailbox works before submission. These pages describe the current free
 POC separately from the future paid service; the product is not launch ready.
 
+### D15 — Five files, any mix; amount_cents is bigint (2026-09-18)
+
+Mechanical limit is now at most 5 files per order, any mix of PDF/JPG/PNG
+(25 MiB combined, 10 pages per PDF, real MIME, server-computed SHA-256).
+The single-PDF-or-images split and its `MIXED_FILE_TYPES` rejection are gone:
+multi-page phone photos of one quotation kept tripping the old rule, and one
+uniform cap is simpler to explain than two. Diverges from PLAN's "10
+pages / 10 imágenes" — PLAN stays as written, this entry is the record.
+Watch the cost side: five 10-page PDFs is 50 pages of model input; tighten
+with a total-page cap if spend says so.
+
+`amount_cents` is `bigint` (edited in the single unmigrated migration, prod
+was never migrated): the Zod range allows ~S/999M, which overflows a 32-bit
+`integer` after model spend. TS side uses `bigint(..., { mode: "number" })`.
+
+Also in this pass: deterministic order-data failures (incomplete context,
+missing/corrupt stored files) fail the order immediately as
+`order_data_invalid` instead of burning 3 claim attempts; MIME↔extension
+mapping lives once in `uploadLimits.ts`; the `analyze.ts` size estimate is
+gone (`validateAnalysisFiles` is the one gate).
+
 ## Phase status
 
 - [x] 0. Scaffold (this file's baseline)

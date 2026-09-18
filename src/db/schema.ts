@@ -4,6 +4,7 @@
 // Neon run the same shape.
 import { sql } from "drizzle-orm";
 import {
+  bigint,
   index,
   integer,
   jsonb,
@@ -23,7 +24,7 @@ export const orders = pgTable(
     status: text("status").notNull(),
     country: text("country").notNull().default("PE"),
     currency: text("currency").notNull().default("PEN"),
-    amountCents: integer("amount_cents"),
+    amountCents: bigint("amount_cents", { mode: "number" }),
     perspective: text("perspective"),
     category: text("category"),
     moment: text("moment"),

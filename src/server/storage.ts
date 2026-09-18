@@ -13,9 +13,20 @@ import {
   markFileDeleted,
   type OrderFile,
 } from "#/db/orders";
-import { isAllowedMime } from "#/lib/uploadLimits";
+import { isAllowedMime, mimeToExtension } from "#/lib/uploadLimits";
 import type { AnalysisInputFile } from "./ai";
 import { captureOperationalError } from "./monitoring";
+
+// Deterministic order data: no retry will fix a missing file, a bad stored
+// MIME, or an integrity mismatch, so the caller fails the order immediately
+// instead of burning attempts. Transport errors (S3, DB) stay plain Errors
+// and keep the retry path.
+export class InvalidOrderData extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidOrderData";
+  }
+}
 
 type BucketConfig = {
   bucket: string;
@@ -61,24 +72,19 @@ export async function loadAnalysisFiles(
   orderId: string,
 ): Promise<AnalysisInputFile[]> {
   const files = await filesForOrder(db, orderId);
-  if (files.length === 0) throw new Error("order has no files");
+  if (files.length === 0) throw new InvalidOrderData("order has no files");
 
   return Promise.all(
     files.map(async (file, index) => {
-      if (!isAllowedMime(file.mime)) throw new Error("stored MIME is invalid");
+      if (!isAllowedMime(file.mime))
+        throw new InvalidOrderData("stored MIME is invalid");
       const bytes = await objectBytes(file.blobPath);
       const sha256 = createHash("sha256").update(bytes).digest("hex");
       if (bytes.byteLength !== file.sizeBytes || sha256 !== file.sha256) {
-        throw new Error("stored object does not match validated metadata");
+        throw new InvalidOrderData("stored object does not match validated metadata");
       }
-      const extension =
-        file.mime === "application/pdf"
-          ? "pdf"
-          : file.mime === "image/jpeg"
-            ? "jpg"
-            : "png";
       return {
-        name: `cotizacion-${index + 1}.${extension}`,
+        name: `cotizacion-${index + 1}.${mimeToExtension(file.mime)}`,
         mime: file.mime,
         dataBase64: Buffer.from(bytes).toString("base64"),
       };
