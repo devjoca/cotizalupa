@@ -35,25 +35,82 @@ type BucketConfig = {
   client: S3Client;
 };
 
+export type StorageSettings = {
+  bucket: string;
+  endpoint: string;
+  region: string;
+  forcePathStyle: boolean;
+  accessKeyId: string;
+  secretAccessKey: string;
+};
+
+const LOCAL_STORAGE_SETTINGS: StorageSettings = {
+  bucket: "cotizalupa",
+  endpoint: "http://127.0.0.1:59000",
+  region: "auto",
+  forcePathStyle: true,
+  accessKeyId: "cotizalupa-local",
+  secretAccessKey: "cotizalupa-local-secret",
+};
+
 let shared: BucketConfig | undefined;
 
-function requiredEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`missing ${name}`);
-  return value;
+type StorageEnv = Partial<Pick<
+  NodeJS.ProcessEnv,
+  | "AWS_S3_BUCKET_NAME"
+  | "AWS_ENDPOINT_URL"
+  | "AWS_ACCESS_KEY_ID"
+  | "AWS_SECRET_ACCESS_KEY"
+  | "AWS_DEFAULT_REGION"
+  | "AWS_S3_URL_STYLE"
+  | "NODE_ENV"
+>>;
+
+export function resolveStorageSettings(
+  env: StorageEnv = process.env,
+): StorageSettings {
+  const configured = [
+    env.AWS_S3_BUCKET_NAME,
+    env.AWS_ENDPOINT_URL,
+    env.AWS_ACCESS_KEY_ID,
+    env.AWS_SECRET_ACCESS_KEY,
+  ];
+  const hasConfiguredStorage = configured.some(Boolean);
+
+  if (hasConfiguredStorage && configured.every(Boolean)) {
+    return {
+      bucket: env.AWS_S3_BUCKET_NAME!,
+      endpoint: env.AWS_ENDPOINT_URL!,
+      region: env.AWS_DEFAULT_REGION ?? "auto",
+      forcePathStyle: env.AWS_S3_URL_STYLE === "path",
+      accessKeyId: env.AWS_ACCESS_KEY_ID!,
+      secretAccessKey: env.AWS_SECRET_ACCESS_KEY!,
+    };
+  }
+
+  if (hasConfiguredStorage) {
+    throw new Error("storage configuration is incomplete");
+  }
+
+  if (env.NODE_ENV === "production") {
+    throw new Error("storage configuration is required");
+  }
+
+  return LOCAL_STORAGE_SETTINGS;
 }
 
 function bucketConfig(): BucketConfig {
   if (shared) return shared;
+  const settings = resolveStorageSettings();
   shared = {
-    bucket: requiredEnv("AWS_S3_BUCKET_NAME"),
+    bucket: settings.bucket,
     client: new S3Client({
-      endpoint: requiredEnv("AWS_ENDPOINT_URL"),
-      region: process.env.AWS_DEFAULT_REGION ?? "auto",
-      forcePathStyle: process.env.AWS_S3_URL_STYLE === "path",
+      endpoint: settings.endpoint,
+      region: settings.region,
+      forcePathStyle: settings.forcePathStyle,
       credentials: {
-        accessKeyId: requiredEnv("AWS_ACCESS_KEY_ID"),
-        secretAccessKey: requiredEnv("AWS_SECRET_ACCESS_KEY"),
+        accessKeyId: settings.accessKeyId,
+        secretAccessKey: settings.secretAccessKey,
       },
     }),
   };

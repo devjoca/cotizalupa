@@ -15,7 +15,11 @@ import {
   transition,
 } from "#/db/orders";
 import { orderFiles, orders } from "#/db/schema";
-import { loadAnalysisFiles, sweepDueOriginals } from "#/server/storage";
+import {
+  loadAnalysisFiles,
+  resolveStorageSettings,
+  sweepDueOriginals,
+} from "#/server/storage";
 import { and, eq, isNull } from "drizzle-orm";
 import { setupTestDb } from "./db";
 
@@ -142,5 +146,33 @@ describe("original deletion", () => {
       client.send(new GetObjectCommand({ Bucket: "cotizalupa", Key: blobPath })),
     ).rejects.toMatchObject({ name: "NoSuchKey" });
     client.destroy();
+  });
+});
+
+describe("storage settings", () => {
+  it("uses the local MinIO defaults when development has no storage env", () => {
+    expect(resolveStorageSettings({ NODE_ENV: "development" })).toEqual({
+      bucket: "cotizalupa",
+      endpoint: "http://127.0.0.1:59000",
+      region: "auto",
+      forcePathStyle: true,
+      accessKeyId: "cotizalupa-local",
+      secretAccessKey: "cotizalupa-local-secret",
+    });
+  });
+
+  it("requires explicit storage settings in production", () => {
+    expect(() => resolveStorageSettings({ NODE_ENV: "production" })).toThrow(
+      "storage configuration is required",
+    );
+  });
+
+  it("does not silently mix a partial configuration with local defaults", () => {
+    expect(() =>
+      resolveStorageSettings({
+        NODE_ENV: "development",
+        AWS_ENDPOINT_URL: "http://127.0.0.1:59000",
+      }),
+    ).toThrow("storage configuration is incomplete");
   });
 });
