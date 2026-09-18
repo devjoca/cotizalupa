@@ -68,6 +68,17 @@ function fakeClient(output_text: string, override: Record<string, unknown> = {})
 }
 
 describe("analyzeQuotation", () => {
+  it("ignores AI_STUB in production", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("AI_STUB", "1");
+    try {
+      const { create, client } = fakeClient(JSON.stringify(valid));
+      await analyzeQuotation(files, { client, context, model: "test-model" });
+      expect(create).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
   it("sends store:false with a strict schema and returns parsed analysis", async () => {
     const { create, client } = fakeClient(JSON.stringify(valid));
     const result = await analyzeQuotation(files, {

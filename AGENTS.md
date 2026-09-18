@@ -12,21 +12,28 @@ what we actually built and decided — read it before changing versions, deps,
 or phase order, and update it in place when a decision changes. If they
 conflict, ask — do not reinterpret either silently.
 
-## What makes CotizaLupa special?
+## POC operating constraints
 
-Three things we can never compromise on. Everything else is negotiable.
+The experiment is whether someone pays $12 USD and finds the report useful.
+These constraints protect that experiment; privacy is an operating obligation,
+not a claim of competitive differentiation.
 
-### 1. Never charge for what we cannot process
+### 1. Preview before payment, analysis after payment
 
-The pre-check exists to protect the commercial unit before money moves. If the
-document is not exactly one legible quotation, reject before payment — never after.
-A `NOT_ANALYZABLE` after payment is a pre-check failure, and it gets saved as an
-eval case so it does not repeat.
+The approved POC has no AI pre-check. The user previews files locally and checks
+that they contain one complete, legible quotation. The server validates technical
+file limits before creating a payment-ready order; this does not certify content.
+Astra checks content only after verified payment. If it cannot produce a report,
+use NOT_ANALYZABLE and a full manual refund. Never fabricate findings. This
+explicitly replaces the earlier never-charge-unprocessable-input rule.
 
-### 2. Privacy by deletion, not by policy
+### 2. Monthly manual deletion
 
 Originals become eligible for the manual deletion sweep at `delete_after`; the
-drain removes them and records `deleted_at`. No persisted
+monthly drain removes them and records `deleted_at`. Eligibility is not a
+guarantee of physical deletion within 30 or 35 days. Pending payments must be
+reviewed manually; paid failures need attention during pilot operation, not
+only on cleanup day. No persisted
 OCR, no full text, no conversations — only `quotation_facts`, the report, and
 operational metadata. OpenAI always with `store: false`. Never add a table, log
 line, or cache that keeps document content past its purpose.
@@ -80,7 +87,8 @@ Use this language when communicating:
 - **we** means Joca and the people building CotizaLupa.
 - **user** means the person uploading a quotation and paying for a report.
 - **order** means one paid review: one quotation, one report, one lifecycle.
-- **pre-check** means the cheap-model gate before payment. It never analyzes gaps.
+- **preview** means the local file-review step before order creation, with no AI.
+- **pre-check** means the deferred cheap-model gate, not part of the paid POC.
 - **analysis** means the Astra pass after payment that produces the report.
 - **facts** means `quotation_facts`: what we analyzed, kept forever without the document.
 - **report** means the JSON + the `/r/{token}` page: clear items, gaps, what-ifs, priorities.
@@ -96,12 +104,13 @@ Use this language when communicating:
    worse than a bug.
 2. **Reading or keeping secrets and documents.** Never open `.env`, `.env.*`, or any
    credentials/keys/token files — yours or any subagent's. Never log, copy, or
-   persist original quotation content, billing, or card data. `payment_events.payload`
-   is stored without `billing` and `card`, and that rule has no exceptions.
+   persist original quotation content outside its temporary private bucket,
+   billing, or card data. `payment_events.payload` is a legacy column; new
+   event records store `{}` and only operational metadata.
 3. **Writing to the live database or bucket.** Production Neon and the Railway bucket
    are the business. Develop against local Postgres and test fixtures. Never point a
    dev server at production, never replay prod rows locally beyond operational
-   metadata, never extend original retention past `delete_after`.
+   metadata, never move `delete_after` later to postpone deletion eligibility.
 
 ## Hit every state
 
@@ -111,8 +120,8 @@ order-flow work done, walk this list and say which entries applied:
 - **Entry points.** Upload is reachable from the landing CTA, the dialog, and the
   pricing section. Fixing one is not fixing the flow. The mockup in `docs/mockup/`
   shows all three — check each.
-- **Statuses.** Every transition in `PLAN.md` "Estados" needs its edge: 30-day
-  expiry for unpaid orders, retry path (`PAYMENT_FAILED` can retry), 3-attempt
+- **Statuses.** Every transition in `PLAN.md` needs its edge: 30-day
+  expiry for staging and unpaid orders, retrying a checkout without a second charge, 3-attempt
   cap, payment reconciliation, and the manual refund step.
   A status with no exit is a bug.
 - **Reverse states.** If you added a way in, add the way out and the way to see it.
@@ -122,8 +131,8 @@ order-flow work done, walk this list and say which entries applied:
 - **Immutability boundary.** From `PAYMENT_PENDING` on, files are frozen: what we
   validated = what we charged = what we analyze. Any edit path must create a new order.
 - **Report page.** `/r/{token}` looks up `sha256(token)`, carries no Meta pixel,
-  and renders only the persisted report. Email delivery and PDF download remain
-  product decisions for a later phase. Any change to report data must render here,
+  and renders persisted order state or the persisted report. Browser print-to-PDF
+  exists; email delivery remains deferred. Any change to report data must render here,
   not just in the JSON.
 - **Privacy.** Any new field, log, or cache holding document content must have a
   deletion story. If it does not expire with `delete_after`, do not add it.
@@ -150,8 +159,8 @@ order-flow work done, walk this list and say which entries applied:
 
 Real quotations are the most sensitive data we hold. Treat them accordingly:
 
-- Default to `fixtures/` (see `fixtures/README.md`). The 8 eval PDFs are the shared
-  vocabulary for pre-check behavior — use them before inventing new cases.
+- Default to `fixtures/` (see `fixtures/README.md`). Synthetic PDFs are generated
+  in memory from those cases; no real quotation belongs in the fixture set.
 - Never copy production originals into your sandbox. If you need a real shape,
   reconstruct a synthetic equivalent and say so.
 - Copy in, never symlink. Data flows one way: into your sandbox, never back out.
@@ -169,9 +178,9 @@ Real quotations are the most sensitive data we hold. Treat them accordingly:
   immutability, reclaim. Do not assert component markup, callback wiring, or mirrors
   of the implementation.
 - **Do not run repo-wide checks** unless asked. CI owns the full suite.
-- `pnpm eval` calls the model, costs money, and runs by hand — never in CI, never to
-  "double-check" something a unit test already covers. Guideline is 9/10 hits, not a
-  strict pass/fail.
+- There is no paid eval command or runner. Keep synthetic fixtures for free tests.
+  Review a few model-generated reports manually before selling; paid model calls
+  are not a substitute for deterministic tests and need explicit authorization.
 - Async flows must be awaited on receipts and drains (`processNext()` outcomes),
   never on sleeps or polling. A test that needs a timeout to pass is wrong.
 - Verify in the environment that matters (CI, no local creds/config), not the
@@ -180,8 +189,8 @@ Real quotations are the most sensitive data we hold. Treat them accordingly:
 ## Payments
 
 The provider is an adapter (`src/server/payments.ts`). Order states do not
-change with the brand. MVP rail is **Paddle** (D8), pending written product
-acceptance. Keep its payload shape inside the adapter rather than order logic.
+change with the brand. MVP rail is **Paddle** (D8), pending application and
+live-domain product review. Keep its payload shape inside the adapter rather than order logic.
 
 Money code has one extra reviewer: the ledger. Every payments change must show:
 
@@ -189,10 +198,14 @@ Money code has one extra reviewer: the ledger. Every payments change must show:
   any state change. Paddle requires its signature and `transaction_id`.
 - `payment_events.provider_event_id` UNIQUE: duplicates answer 200 and stop.
 - Conditional transition (`PAID` only from `PAYMENT_PENDING`, zero rows = no-op).
-- Webhook and browser return entering through the same path — tested, not asserted.
+- Event insertion and the conditional paid transition share a database transaction.
+- The browser return only reads status. Only verified webhook handling writes PAID.
+- Repeated checkout requests and provider timeouts cannot create duplicate charges.
+- The $12 USD review price is independent of the approximate quotation amount in PEN.
 - No new persisted PII. DNI, address, card, and billing never touch the database.
 
-Refunds: provider dashboard (or their API), then `UPDATE orders SET status='REFUNDED'`.
+Refunds: provider dashboard (or their API), then a conditional transition from
+`PROCESSING_FAILED` or `NOT_ANALYZABLE` to `REFUNDED`, clearing transient context.
 There is no auto-refund code path in the MVP.
 
 ## Commits and PRs
@@ -208,8 +221,9 @@ There is no auto-refund code path in the MVP.
 
 Most code changes do not need a documentation change. Agents can read the code.
 
-- `PLAN.md` is the product spec: phase order, state machine, schemas, test lists.
-  It is guidance, not frozen — do not rewrite it when we diverge.
+- `PLAN.md` is the concise paid-POC scope, flow, launch conditions and deferrals.
+  Update it when an approved product decision changes. Do not copy SQL or schemas
+  into it; code and migrations record those.
 - `IMPLEMENTATION.md` is the record of what we actually built and decided.
   When a version, dep, or phase-order decision changes, update it in place.
   A change big enough to contradict the plan needs an explicit sign-off first.
@@ -234,14 +248,18 @@ Most code changes do not need a documentation change. Agents can read the code.
 ## How it works
 
 ```
-CREATE ORDER → UPLOAD → MECHANICAL VALIDATION → PRE-CHECK IA → READY_FOR_PAYMENT
+LOCAL PREVIEW → DIRECT UPLOAD → MECHANICAL VALIDATION → STAGE ORIGINALS → READY_FOR_PAYMENT
 → CHECKOUT (Paddle MVP) → PAID → CLAIM → ASTRA ANALYSIS → ZOD → SAVE REPORT + FACTS
 → COMPLETED → ORIGINAL DUE → MANUAL DRAIN DELETES IT
 ```
 
-Clients upload to presigned URLs. The server validates mechanically (`file-type`,
-`unpdf`, 25 MB, 10 pages/images, server-computed `sha256`), runs the cheap-model
-pre-check, and only then opens checkout. After idempotent payment confirmation,
+Clients upload directly to the server. It validates mechanically (`file-type`,
+`unpdf`, 25 MiB total, 5 mixed PDF/JPG/PNG files, 10 pages per PDF,
+server-computed `sha256`). No model runs before payment.
+Mechanically invalid files are not persisted. Valid files get a CREATED order
+and file manifest before bucket writes; only successful writes produce
+READY_FOR_PAYMENT. There is no edit endpoint; new files require a new order.
+Checkout remains unavailable until Paddle is integrated. After idempotent payment confirmation,
 `processNext()` claims the order (`FOR UPDATE SKIP LOCKED`), calls Astra with
 `store: false` and strict `json_schema`, validates with Zod as a second barrier,
 saves report + facts, and marks `COMPLETED`. One sweep deletes originals past
@@ -258,7 +276,7 @@ saves report + facts, and marks `COMPLETED`. One sweep deletes originals past
 - `src/lib/schemas.ts` — report + `quotation_facts` schemas (Zod 4, strict).
 - `ops/queries.sql` — hand-run operational queries (no admin UI).
 - `tests/` — `pnpm test`: deterministic Vitest suite, runs in CI.
-- `eval/` + `fixtures/` — `pnpm eval`: hand-run model evals, costs money.
+- `fixtures/` — synthetic documents used by free deterministic tests.
 - `docs/mockup/` — static landing/flow reference (read-only, do not ship as-is).
 - `docs/pricing.md` — ticket ($12 USD), rail (Paddle first), unit economics. Change number or rail here and in D7/D8 together.
 - `drizzle/` — generated migrations (`pnpm db:generate`, `pnpm db:migrate`).

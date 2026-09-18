@@ -2,10 +2,10 @@
 -- read-only queries explain what the command sees. Do not bulk-update
 -- PAYMENT_PENDING: confirm each transaction in Paddle first.
 
--- 1. Unpaid orders the drain expires after 30 days
+-- 1. Staging uploads and unpaid orders the drain expires after 30 days
 SELECT id, status, created_at, delete_after
 FROM orders
-WHERE status IN ('READY_FOR_PAYMENT', 'PAYMENT_FAILED')
+WHERE status IN ('CREATED', 'READY_FOR_PAYMENT', 'PAYMENT_FAILED')
   AND created_at <= now() - interval '30 days'
 ORDER BY created_at;
 
@@ -53,7 +53,8 @@ SELECT id, status, refund_requested_at
 FROM orders
 WHERE refund_requested_at IS NOT NULL AND status <> 'REFUNDED';
 
--- 8. Cost per order in the last 30 days
+-- 8. Optional existing metadata. No cost dashboard is required for the POC.
+-- cost_usd may be NULL; the current pipeline does not calculate model prices.
 SELECT o.id, o.status, r.model, r.input_tokens, r.output_tokens, r.cost_usd
 FROM orders o
 LEFT JOIN reports r ON r.order_id = o.id

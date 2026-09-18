@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { caseUploads, analysisCases, syntheticPdf } from "../fixtures/analysis";
 
 import {
   MechanicalValidationError,
@@ -23,6 +24,21 @@ function upload(
 }
 
 describe("mechanical analysis validation", () => {
+  it.each(analysisCases)("validates the synthetic document $name", async (testCase) => {
+    const result = await validateAnalysisFiles(caseUploads(testCase));
+    expect(result).toHaveLength(testCase.documents.length);
+    expect(result.map((file) => file.pages)).toEqual(testCase.documents.map((pages) => pages.length));
+  });
+
+  it("rejects an eleven-page PDF", async () => {
+    await expect(validateAnalysisFiles([upload(syntheticPdf(Array.from({ length: 11 }, () => ["Synthetic page"])), "application/pdf")])).rejects.toMatchObject({ code: "PDF_TOO_LONG" });
+  });
+
+  it("rejects a password-protected PDF before model work", async () => {
+    const pdf = syntheticPdf([["Synthetic private page"]]).toString();
+    const encrypted = pdf.replace("trailer\n<<", "trailer\n<< /Encrypt << /Filter /Standard /V 1 /R 2 /P -4 /O (00000000000000000000000000000000) /U (00000000000000000000000000000000) >> /ID [<0123456789abcdef> <0123456789abcdef>]");
+    await expect(validateAnalysisFiles([upload(Buffer.from(encrypted), "application/pdf")])).rejects.toMatchObject({ code: "INVALID_PDF" });
+  });
   it("accepts a valid PDF even when the runtime proxy has no destroy method", async () => {
     const [result] = await validateAnalysisFiles([
       upload(onePagePdf, "application/pdf", "quote.pdf"),

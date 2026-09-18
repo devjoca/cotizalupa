@@ -60,8 +60,8 @@ export const ReviewContextInputSchema = z
 
 export type ReviewContext = z.infer<typeof ReviewContextInputSchema>;
 
-// Single post-upload Astra pass (IMPLEMENTATION.md D9). One call returns the
-// commercial-unit check, the report, and the facts. Strict json_schema needs
+// Paid Astra analysis checks the commercial unit and produces the report.
+// The analysis returns the document check, report and facts. Strict json_schema needs
 // every field required, so unknowns are `null` — never inferred, never guessed.
 export const DocumentCheckSchema = z.strictObject({
   is_quotation: z.boolean(),
@@ -118,12 +118,8 @@ export const AnalysisWireSchema = z.strictObject({
 function documentIsAnalyzable(
   document: z.infer<typeof DocumentCheckSchema>,
 ): boolean {
-  return (
-    document.is_quotation &&
-    document.is_legible &&
-    document.quotation_count === 1 &&
-    document.is_single_commercial_proposal
-  );
+  return document.is_quotation && document.is_legible &&
+    document.quotation_count === 1 && document.is_single_commercial_proposal;
 }
 
 export const AnalysisSchema = AnalysisWireSchema.superRefine(

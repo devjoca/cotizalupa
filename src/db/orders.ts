@@ -1,6 +1,5 @@
 // Thin data-access: plain functions, SQL in plain sight. Status changes are
-// conditional updates (zero rows = no-op); the claim query is PLAN.md
-// "Procesamiento" verbatim. Every function takes the DB first so tests inject
+// conditional updates (zero rows = no-op). Every function takes the DB first so tests inject
 // an isolated PostgreSQL database while the app passes the getDb() singleton.
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { and, eq, inArray, isNull, lte, sql } from "drizzle-orm";
@@ -77,21 +76,29 @@ export async function recordFile(
     pages?: number | null;
   },
 ): Promise<OrderFile> {
-  const [row] = await db
-    .insert(orderFiles)
-    .values({
-      id: randomUUID(),
-      orderId: input.orderId,
-      position: input.position,
-      blobPath: input.blobPath,
-      mime: input.mime,
-      sizeBytes: input.sizeBytes,
-      sha256: input.sha256,
-      pages: input.pages ?? null,
-    })
-    .returning();
-  if (!row) throw new Error("recordFile inserted no row");
-  return row;
+  return db.transaction(async (tx) => {
+    const [order] = await tx
+      .select({ status: orders.status })
+      .from(orders)
+      .where(eq(orders.id, input.orderId))
+      .for("update");
+    if (order?.status !== "CREATED") throw new Error("order files are frozen");
+    const [row] = await tx
+      .insert(orderFiles)
+      .values({
+        id: randomUUID(),
+        orderId: input.orderId,
+        position: input.position,
+        blobPath: input.blobPath,
+        mime: input.mime,
+        sizeBytes: input.sizeBytes,
+        sha256: input.sha256,
+        pages: input.pages ?? null,
+      })
+      .returning();
+    if (!row) throw new Error("recordFile inserted no row");
+    return row;
+  });
 }
 
 // Conditional transition: returns the row, or undefined when the order was
@@ -119,7 +126,7 @@ export async function transition(
   return row;
 }
 
-// Orders start with a 30-day deletion ceiling. Safe terminal states shorten it;
+// Orders start with 30-day deletion eligibility. Safe terminal states shorten it;
 // failed paid analyses keep the original deadline for manual recovery/refund.
 export function rejectOrder(db: Db = getDb(), id: string, from: string) {
   return transition(db, id, from, "REJECTED", {
@@ -153,14 +160,14 @@ export function markNotAnalyzable(
   });
 }
 
-export function markRefunded(db: Db = getDb(), id: string, from: string) {
+export function markRefunded(db: Db = getDb(), id: string, from: "PROCESSING_FAILED" | "NOT_ANALYZABLE") {
   return transition(db, id, from, "REFUNDED", {
     deleteAfter: new Date(),
     userContext: null,
   });
 }
 
-// The claim query, PLAN.md "Procesamiento" verbatim: one funnel for the
+// One claim query for the
 // webhook fast path and the manual drain. Stale PROCESSING rows
 // (>15 min, attempts left) are re-claimed; after 3 attempts the cap holds.
 export async function claimNext(
@@ -256,9 +263,8 @@ export async function saveReportAndComplete(
   return (result as unknown as { rows: Array<{ id: string }> }).rows.length > 0;
 }
 
-// The free POC has no payment or queued worker. Once its synchronous analysis
-// succeeds, persist the terminal order and report together so the browser can
-// move to the same durable /r/{token} page used by the paid flow.
+// Legacy free-POC helper retained for fixture compatibility. It is not exposed
+// by a server function; the current public submission only prepares an order.
 export async function createCompletedDemoReport(
   db: Db = getDb(),
   input: {
@@ -361,7 +367,7 @@ export async function expireStaleUnpaidOrders(
     })
     .where(
       and(
-        inArray(orders.status, ["READY_FOR_PAYMENT", "PAYMENT_FAILED"]),
+        inArray(orders.status, ["CREATED", "READY_FOR_PAYMENT", "PAYMENT_FAILED"]),
         lte(orders.createdAt, daysAgo(STALE_ORDER_DAYS)),
       ),
     )
@@ -467,7 +473,6 @@ export async function recordPaymentEvent(
     providerEventId: string;
     orderId?: string | null;
     eventType: string;
-    payload: unknown;
   },
 ) {
   const [row] = await db
@@ -478,25 +483,12 @@ export async function recordPaymentEvent(
       providerEventId: input.providerEventId,
       orderId: input.orderId ?? null,
       eventType: input.eventType,
-      payload: sanitizePaymentPayload(input.payload),
+      // Keep the existing non-null column without retaining provider content.
+      payload: {},
     })
     .onConflictDoNothing({ target: paymentEvents.providerEventId })
     .returning();
   return row;
-}
-
-const PRIVATE_PAYMENT_FIELDS = /billing|card|address|dni|email|phone|name/i;
-
-// Defense in depth at the persistence boundary: even a future adapter mistake
-// cannot write billing, cardholder, or direct identity data into the event ledger.
-export function sanitizePaymentPayload(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(sanitizePaymentPayload);
-  if (value === null || typeof value !== "object") return value;
-  return Object.fromEntries(
-    Object.entries(value)
-      .filter(([key]) => !PRIVATE_PAYMENT_FIELDS.test(key))
-      .map(([key, entry]) => [key, sanitizePaymentPayload(entry)]),
-  );
 }
 
 // Only safe terminal states can enter deletion. A bad date must never delete

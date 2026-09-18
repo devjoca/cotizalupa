@@ -1,4 +1,4 @@
-// Tables per PLAN.md "Modelo de datos". Status stays text + conditional
+// Status stays text + conditional
 // updates in orders.ts — no enum, no state-machine library.
 // IDs are app-generated (crypto.randomUUID), never a DB default, so tests and
 // Neon run the same shape.
@@ -34,11 +34,11 @@ export const orders = pgTable(
     reportTokenHash: text("report_token_hash").notNull().unique(),
     paymentProvider: text("payment_provider"),
     paymentTransactionId: text("payment_transaction_id"),
-    precheckResult: jsonb("precheck_result"),
+    precheckResult: jsonb("precheck_result"), // Legacy, unused by the pay-first POC.
     processingStartedAt: timestamp("processing_started_at", {
       withTimezone: true,
     }),
-    // Hard ceiling for original retention. Safe terminal transitions shorten it.
+    // Deletion eligibility. Physical deletion happens in the monthly drain.
     deleteAfter: timestamp("delete_after", { withTimezone: true })
       .notNull()
       .default(sql`now() + interval '30 days'`),
@@ -114,11 +114,11 @@ export const reports = pgTable("reports", {
 export const paymentEvents = pgTable("payment_events", {
   id: uuid("id").primaryKey(),
   provider: text("provider").notNull(),
-  // Idempotency key: duplicates answer 200 and stop. No billing/card in payload, ever.
+  // Idempotency key: duplicates answer 200 and stop.
   providerEventId: text("provider_event_id").notNull().unique(),
   orderId: uuid("order_id").references(() => orders.id),
   eventType: text("event_type").notNull(),
-  payload: jsonb("payload").notNull(),
+  payload: jsonb("payload").notNull(), // Legacy column; new events store {} only.
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

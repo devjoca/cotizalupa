@@ -32,7 +32,7 @@ function PrivacyPage() {
       <section>
         <h2>Datos que recibimos</h2>
         <p>
-          Cuando solicitas generar un reporte en la demostración, recibimos el
+          Cuando creas una orden, recibimos el
           archivo o archivos que envías y el contexto que escribes: la
           perspectiva, categoría, momento, monto aproximado y preocupación.
           También recibimos metadatos técnicos necesarios para validar y
@@ -66,28 +66,43 @@ function PrivacyPage() {
       <section>
         <h2>Qué conservamos</h2>
         <p>
-          En la demostración actual procesamos el archivo original y tu
-          preocupación escrita de forma temporal, sin guardarlos en nuestra
-          base de datos ni en un depósito de archivos. Sí
-          conservamos el reporte, los hechos estructurados extraídos de la
-          cotización y los metadatos operativos necesarios para que el enlace
-          del reporte funcione y para operar el servicio. Esos datos se conservan
-          sin un plazo de eliminación automática. Puedes solicitar su eliminación
-          al correo de soporte.
+          La vista previa del formulario muestra los archivos en tu navegador,
+          sin enviarlos al servidor. Al crear la orden, validamos el formato,
+          tamaño y páginas, y guardamos los archivos compatibles en un depósito
+          privado junto con el contexto necesario para la revisión. Esta
+          validación técnica no comprueba su contenido ni su legibilidad.
+          Los pagos todavía no están habilitados. Crear la orden no llama a la
+          IA ni genera el reporte.
+        </p>
+        <p>
+          Realizamos una limpieza manual mensual. Las solicitudes sin pago
+          vencen a los 30 días y sus originales se eliminan en la siguiente
+          limpieza. Esto puede acercar la conservación a dos meses desde la
+          carga. Los originales de revisiones completadas o reembolsadas pueden
+          eliminarse antes, en la siguiente limpieza. Los pagos por confirmar
+          y las revisiones en curso se resuelven antes de borrar sus archivos.
+          La preocupación escrita se elimina al cerrar o vencer la solicitud.
+        </p>
+        <p>
+          Conservamos los reportes ya generados, los hechos estructurados y los
+          metadatos operativos para que sus enlaces funcionen, sin un plazo de
+          eliminación automática. Estos datos pueden contener información de
+          la cotización. Puedes solicitar su eliminación al correo de soporte.
         </p>
         <p>
           El enlace del reporte funciona como una llave. Cualquier persona que
           tenga el enlace puede leer ese reporte, así que no lo compartas en un
           lugar público. Los reportes pueden contener información tomada de la
-          cotización. La versión para el servicio pagado indicará el plazo de
-          conservación de los archivos originales y su eliminación.
+          cotización. Eliminar el original no elimina automáticamente el reporte
+          ni los datos extraídos.
         </p>
       </section>
 
       <section>
         <h2>Proveedores</h2>
         <p>
-          Enviamos el documento y el contexto a OpenAI para generar el reporte.
+          Solo después de confirmar el pago enviaremos el documento y el
+          contexto a OpenAI para generar el reporte. No usamos IA antes del pago.
           Solicitamos que la respuesta no se almacene para su consulta posterior.
           OpenAI puede conservar datos para controles de abuso u otras obligaciones
           según sus políticas y la configuración del servicio. Esto no equivale

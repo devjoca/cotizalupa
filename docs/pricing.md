@@ -44,7 +44,7 @@ premium to keep consumer invoicing and payment-tax handling out of the product.
 Paddle is the seller to the customer. Flow we want:
 
 ```
-upload → mechanical validation → pre-check → Paddle checkout
+local preview → upload → mechanical validation → Paddle checkout
 → webhook paid → analyze → /r/{token}
 ```
 
@@ -77,12 +77,13 @@ questions below for the application and the written record of the outcome
 before writing `src/server/payments.ts`.
 
 > Planned paid service: CotizaLupa is a one-shot digital product. The customer uploads one
-> quotation (PDF or photos), we run a cheap pre-check, then they pay
+> quotation (PDF or photos), previews it and submits it for technical validation, then pays
 > ~USD 12 once (card) and receive a report URL: what is clear, missing,
 > risky, and which questions to ask. No account, no subscription, no
 > physical goods. Initial ads: Spanish, Peru, then other LATAM.
 >
-> We never charge if the document is not exactly one legible quotation.
+> There is no AI pre-check. We ask customers to send one complete, legible quotation.
+> We check content only after payment; unsuitable input can require a manual refund.
 > If payment succeeds but we cannot deliver the report, we refund the full
 > review price. We do not persist payment-provider DNI, address, card, or billing.
 >
@@ -91,7 +92,7 @@ before writing `src/server/payments.ts`.
 > 2. One-shot USD checkout (not subscription) is supported.
 > 3. Webhook: signed, retry policy, stable event id, amount + currency
 >    in the payload, sandbox vs live.
-> 4. We can open checkout only after our pre-check passes, and bind the
+> 4. We can open checkout only after technical file validation passes, and bind the
 >    Paddle order to our `orders.id`.
 > 5. Refunds: dashboard and/or API; whether your fee is returned.
 > 6. Customer invoice language (Spanish?) and whether you collect/remit
@@ -105,17 +106,22 @@ before writing `src/server/payments.ts`.
 
 Provider is an adapter. These rules do not change:
 
-- No checkout until pre-check accepts. Files freeze at `PAYMENT_PENDING`.
+- No checkout until files pass mechanical validation and are stored. Files freeze at `PAYMENT_PENDING`.
 - Verify authenticity, success, `order id`, amount, and currency before
   any state change.
 - `payment_events.provider_event_id` UNIQUE; duplicates return 200 and stop.
 - `PAID` only from `PAYMENT_PENDING`. Zero rows = no-op.
-- Webhook and browser return share one path.
-- No DNI, address, card, or billing in the database.
+- Event insertion and the paid transition commit together. The browser return
+  only reads status; only a verified webhook writes PAID.
+- Checkout retries must not duplicate charges, including provider timeouts.
+- Match the registered transaction ID and the server-owned $12 USD ticket.
+  `orders.amount_cents` is the quotation's approximate amount in PEN, not the fee.
+- Persist event metadata only. The legacy payload column receives `{}`.
+- No payment-provider DNI, address, card, or billing in the database.
 - Refunds: provider dashboard/API, then `status = 'REFUNDED'`. No
   auto-refund code in the MVP.
-- Meta **Purchase** only on `PAID`. Never on `PAYMENT_PENDING`, never on
-  `/r/{token}`.
+- CAPI remains a separate next integration after Paddle. Send **Purchase** only
+  for a verified paid order, deduplicated by order. No Meta pixel on `/r/{token}`.
 
 `orders.payment_provider` and `payment_events.provider` exist so the
 adapter can change without a new order model.
@@ -128,15 +134,14 @@ adapter can change without a new order model.
 | UIT 2026 | S/5,500 | D.S. 301-2025-EF |
 | Inference cap | **$1.00 = S/3.40** | Worst case we budget, not the mean |
 | Typical Astra medium | $0.25–$0.70 | 2–4 page quotation |
-| Pre-check + crumbs | ~S/0.30 | Cheapest model |
 | Peru Meta CPC | S/0.30–S/1.50 | Local 2026 ranges |
 | Peru conversion CPA | S/15–S/45 | Cold conversion |
 | Paddle take | Pending written quote | MoR premium; do not invent the rate |
 
 ## Meta CAC (unchanged by the rail)
 
-CAC is cash to Meta per **paid** order. Pre-check rejects still ate the
-click.
+CAC is cash to Meta per **paid** order. Abandoned uploads and refunded orders still cost the
+click; refunds can also cost inference and provider fees.
 
 | Scenario | CAC | When |
 |---|---:|---|
@@ -154,9 +159,11 @@ media at harsh CAC). Agency fees extra. Accountant treats Meta IGV.
 ## Guardrails so $1 stays $1
 
 - Analysis: Astra, `reasoning_effort: medium`. Never `high` in the MVP.
-- Pre-check: cheapest model.
-- 10-page cap stays.
-- `reports.cost_usd`: log and inspect at $1.
+- No model before payment. Manually review a few generated reports before launch.
+- Five mixed PDF/JPG/PNG files, 25 MiB combined, 10 pages per PDF. Five PDFs
+  can reach 50 pages; the $1 figure above is a budget assumption, not an enforced cap.
+- Keep existing usage metadata. No new cost telemetry or dashboard before sales;
+  `reports.cost_usd` remains nullable until prices are explicitly configured.
 - Never spend Astra before money clears.
 
 ## What this file does not decide

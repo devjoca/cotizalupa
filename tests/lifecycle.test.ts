@@ -16,10 +16,10 @@ import {
   findOrderByTokenHash,
   hashReportToken,
   newReportToken,
+  markRefunded,
   recordFile,
   recordPaymentEvent,
   rejectOrder,
-  sanitizePaymentPayload,
   saveReportAndComplete,
   stalePaymentPending,
   transition,
@@ -58,15 +58,25 @@ async function ageProcessingStartedBy(id: string, minutes: number) {
     .where(eq(orders.id, id));
 }
 
-describe.skip("mechanical validation", () => {
-  it(">10 pages rejected", () => {});
-  it("encrypted pdf rejected", () => {});
-});
-
 describe("order lifecycle", () => {
-  // Lands with the checkout freeze: enforced where uploads stop being
-  // accepted after PAYMENT_PENDING (phase 3), not in this layer.
-  it.skip("files immutable after PAYMENT_PENDING", () => {});
+  it("records a manual refund conditionally and clears transient context", async () => {
+    const order = await createOrder(db, {
+      reportTokenHash: hashReportToken(newReportToken()), userContext: "Synthetic concern",
+    });
+    expect(await markRefunded(db, order.id, "PROCESSING_FAILED")).toBeUndefined();
+    await transition(db, order.id, "CREATED", "PROCESSING_FAILED");
+    expect(await markRefunded(db, order.id, "PROCESSING_FAILED")).toMatchObject({ status: "REFUNDED", userContext: null });
+    expect(await markRefunded(db, order.id, "PROCESSING_FAILED")).toBeUndefined();
+  });
+  it.each(["READY_FOR_PAYMENT", "PAYMENT_PENDING", "PAID", "PROCESSING", "COMPLETED"])("refuses file edits in %s", async (status) => {
+    const order = await createOrder(db, { reportTokenHash: hashReportToken(newReportToken()) });
+    await transition(db, order.id, "CREATED", status);
+    await expect(recordFile(db, {
+      orderId: order.id, position: 0, blobPath: "synthetic/frozen.pdf",
+      mime: "application/pdf", sizeBytes: 12, sha256: "abc",
+    })).rejects.toThrow("order files are frozen");
+    expect(await filesForOrder(db, order.id)).toEqual([]);
+  });
 
   it("terminal states set delete_after", async () => {
     const completed = await paidOrder();
@@ -120,7 +130,7 @@ describe("order lifecycle", () => {
   });
 
   it("sweep finds only files past delete_after", async () => {
-    const order = await paidOrder();
+    const order = await createOrder(db, { reportTokenHash: hashReportToken(newReportToken()) });
     const file = await recordFile(db, {
       orderId: order.id,
       position: 0,
@@ -130,6 +140,7 @@ describe("order lifecycle", () => {
       sha256: "abc",
       pages: 1,
     });
+    await transition(db, order.id, "CREATED", "PAID");
     // Active orders never enter the sweep, even with a bad past deadline.
     expect(await dueForDeletion(db)).toHaveLength(0);
     await db
@@ -177,40 +188,20 @@ describe("order lifecycle", () => {
     ).rejects.toThrow();
   });
 
-  it("scrubs private payment fields before persistence", async () => {
+  it("stores only event metadata and deduplicates the provider event", async () => {
     const order = await createOrder(db, {
       reportTokenHash: hashReportToken(newReportToken()),
     });
-    const payload = {
-      transaction_id: "txn_1",
-      billing_details: { name: "Private", address: "Private" },
-      payment_method: { card: { last4: "4242" }, type: "card" },
-      customer: {
-        dni: "12345678",
-        email: "private@example.com",
-        name: "Private",
-        locale: "es-PE",
-      },
-    };
-
-    expect(sanitizePaymentPayload(payload)).toEqual({
-      transaction_id: "txn_1",
-      payment_method: { type: "card" },
-      customer: { locale: "es-PE" },
-    });
-    await recordPaymentEvent(db, {
+    const event = {
       provider: "paddle",
       providerEventId: "evt_1",
       orderId: order.id,
       eventType: "transaction.completed",
-      payload,
-    });
+    };
+    expect(await recordPaymentEvent(db, event)).toBeDefined();
+    expect(await recordPaymentEvent(db, event)).toBeUndefined();
     const [stored] = await db.select().from(paymentEvents);
-    expect(stored?.payload).toEqual({
-      transaction_id: "txn_1",
-      payment_method: { type: "card" },
-      customer: { locale: "es-PE" },
-    });
+    expect(stored?.payload).toEqual({});
   });
 
   it("expires only stale unpaid orders", async () => {

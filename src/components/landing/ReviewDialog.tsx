@@ -3,7 +3,8 @@ import { useNavigate } from "@tanstack/react-router";
 
 import { fileToUpload } from "#/lib/fileBase64";
 import { CATEGORIES, MOMENTS, OTHER_CATEGORY } from "#/lib/reviewContext";
-import { analyzeAndPersistReport } from "#/server/analyze";
+import { extensionToMime } from "#/lib/uploadLimits";
+import { prepareReview } from "#/server/analyze";
 import {
   flowReducer,
   initialFlowState,
@@ -16,6 +17,35 @@ interface ReviewDialogProps {
   open: boolean;
   reviewsDisabled: boolean;
   onClose: () => void;
+}
+
+function FilePreview({ file, onRemove, disabled }: {
+  file: File;
+  onRemove: () => void;
+  disabled: boolean;
+}) {
+  const [url, setUrl] = useState<string>();
+  useEffect(() => {
+    const objectUrl = URL.createObjectURL(file);
+    setUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [file]);
+  const isImage = (file.type || extensionToMime(file.name))?.startsWith("image/");
+  return (
+    <li className="file-preview">
+      {url && isImage && <img src={url} alt={`Vista previa de ${file.name}`} />}
+      <div className="file-preview-actions">
+        {url ? (
+          <a href={url} target="_blank" rel="noreferrer">
+            {isImage ? "Ampliar imagen" : "Abrir PDF"}: {file.name}
+          </a>
+        ) : <span>{file.name}</span>}
+        <button type="button" disabled={disabled} onClick={onRemove} aria-label={`Quitar ${file.name}`}>
+          Quitar
+        </button>
+      </div>
+    </li>
+  );
 }
 
 function scrollToExample() {
@@ -33,8 +63,8 @@ export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogPro
   const disabled = reviewsDisabled || serverDisabled;
   const [state, dispatch] = useReducer(flowReducer, initialFlowState);
   const [files, setFiles] = useState<File[]>([]);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [preparing, setPreparing] = useState(false);
+  const [preparationError, setPreparationError] = useState<string | null>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const openerRef = useRef<Element | null>(null);
@@ -49,8 +79,8 @@ export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogPro
     requestIdRef.current += 1;
     dispatch({ type: "open" });
     setFiles([]);
-    setAnalysisError(null);
-    setAnalyzing(false);
+    setPreparationError(null);
+    setPreparing(false);
     if (!dialog.open) dialog.showModal();
   }, [open]);
 
@@ -120,13 +150,13 @@ export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogPro
     dispatch({ type: "next", hasFile: disabled || files.length > 0 });
   }
 
-  // The free POC persists and opens the report without a payment.
-  async function runAnalysis() {
-    if (disabled || files.length === 0 || analyzing) return;
+  // Preparation returns the private link later used for checkout and report.
+  async function createReviewOrder() {
+    if (disabled || files.length === 0 || preparing) return;
     const category = CATEGORIES.find((value) => value === state.category);
     const moment = MOMENTS.find((value) => value === state.moment);
     if (!category || !moment) {
-      setAnalysisError("Completa la categoría y el momento antes de analizar.");
+      setPreparationError("Completa la categoría y el momento antes de continuar.");
       return;
     }
     const requestId = ++requestIdRef.current;
@@ -138,11 +168,11 @@ export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogPro
       moment,
       concern: state.concern,
     };
-    setAnalyzing(true);
-    setAnalysisError(null);
+    setPreparing(true);
+    setPreparationError(null);
     try {
       const uploads = await Promise.all(fileSnapshot.map(fileToUpload));
-      const nextResult = await analyzeAndPersistReport({
+      const nextResult = await prepareReview({
         data: {
           files: uploads,
           perspective: "customer",
@@ -150,7 +180,7 @@ export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogPro
         },
       });
       if (requestIdRef.current !== requestId) return;
-      if (nextResult.status === "COMPLETED") {
+      if (nextResult.status === "READY_FOR_PAYMENT") {
         await navigate({
           to: "/r/$token",
           params: { token: nextResult.report_token },
@@ -158,17 +188,15 @@ export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogPro
         return;
       }
       if (nextResult.status === "REVIEWS_DISABLED") setServerDisabled(true);
-      setAnalysisError(nextResult.message);
-    } catch (err) {
+      setPreparationError(nextResult.message);
+    } catch {
       if (requestIdRef.current === requestId) {
-        setAnalysisError(
-          err instanceof Error
-            ? err.message
-            : "No se pudo solicitar el análisis.",
+        setPreparationError(
+          "No pudimos preparar la orden. Inténtalo de nuevo. No se realizó ningún cobro.",
         );
       }
     } finally {
-      if (requestIdRef.current === requestId) setAnalyzing(false);
+      if (requestIdRef.current === requestId) setPreparing(false);
     }
   }
 
@@ -330,9 +358,9 @@ export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogPro
               )}
               <p className="privacy-note">
                 Puedes ocultar nombres, teléfonos, DNI/RUC y direcciones. El
-                archivo se usa solo para generar el reporte y CotizaLupa no lo
-                guarda en esta demo. Al generar el reporte, enviamos el archivo y el
-                contexto a OpenAI con almacenamiento desactivado. Conservamos el reporte y los datos extraídos.
+                archivo se guardará temporalmente al crear la orden.
+                CotizaLupa lo analizará después del pago.
+                Eliminamos los originales elegibles en una limpieza mensual.
                 Consulta la <a href="/privacidad" target="_blank" rel="noreferrer">política de privacidad</a>
                 {" "}y los <a href="/terminos" target="_blank" rel="noreferrer">términos de uso</a>.
               </p>
@@ -381,12 +409,38 @@ export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogPro
           {state.step === 3 && (
             <>
               <h2 id="flow-title" tabIndex={-1}>
-                Confirma tu revisión
+                Revisa antes de pagar
               </h2>
               <p>
                 {disabled
                   ? "Así será el resumen de tu revisión. La generación está deshabilitada."
-                  : "Revisa los datos antes de generar tu reporte gratuito."}
+                  : "Revisa que envíes una sola cotización, con todas sus páginas y el texto legible. No compares cotizaciones de distintos proveedores."}
+              </p>
+              {open && files.length > 0 ? (
+                <ul className="file-previews">
+                  {files.map((file, index) => (
+                    <FilePreview
+                      key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
+                      file={file}
+                      disabled={preparing}
+                      onRemove={() => { removeFile(index); setPreparationError(null); }}
+                    />
+                  ))}
+                </ul>
+              ) : <p>No hay archivos seleccionados. Vuelve atrás para agregarlos.</p>}
+              <button
+                type="button"
+                className="flow-demo-link"
+                disabled={preparing}
+                onClick={() => { setPreparationError(null); dispatch({ type: "back" }); }}
+              >
+                Agregar o reemplazar archivos
+              </button>
+              <p className="privacy-note">
+                Antes del pago solo validamos el formato, tamaño y páginas de los
+                archivos, no su contenido. CotizaLupa los analizará después del pago.
+                Si no podemos entregar el reporte, gestionaremos el reembolso
+                manual. <a href="/reembolsos" target="_blank" rel="noreferrer">Ver condiciones</a>.
               </p>
               <div className="summary-row">
                 <span>Perspectiva</span>
@@ -417,7 +471,7 @@ export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogPro
                 <br />
                 {disabled
                   ? "La generación de reportes está deshabilitada."
-                  : "Al generar el reporte, enviamos el archivo y el contexto a OpenAI para analizarlos con IA, con almacenamiento desactivado. CotizaLupa no guarda el archivo original ni tu preocupación escrita; conserva el reporte y los datos extraídos."}
+                  : "Puedes crear la orden y guardar tus archivos. Los pagos todavía no están habilitados. El análisis y el reporte estarán disponibles después del pago."}
               </div>
               <button
                 type="button"
@@ -429,9 +483,9 @@ export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogPro
               >
                 Ver reporte de ejemplo →
               </button>
-              {analysisError && (
+              {preparationError && (
                 <p className="privacy-note" role="alert">
-                  No se pudo analizar: {analysisError}
+                  {preparationError}
                 </p>
               )}
             </>
@@ -445,9 +499,9 @@ export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogPro
             type="button"
             className={`button outline${state.step === 1 ? " hidden" : ""}`}
             id="back"
-            disabled={analyzing}
+            disabled={preparing}
             onClick={() => {
-              setAnalysisError(null);
+              setPreparationError(null);
               dispatch({ type: "back" });
             }}
           >
@@ -458,14 +512,14 @@ export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogPro
               type="button"
               className="button blue"
               id="next"
-              disabled={disabled || files.length === 0 || analyzing}
-              onClick={runAnalysis}
+              disabled={disabled || files.length === 0 || preparing}
+              onClick={createReviewOrder}
             >
               {disabled
                 ? "Revisiones no disponibles"
-                : analyzing
-                  ? "Preparando reporte…"
-                  : "Generar mi reporte gratis"}
+                : preparing
+                  ? "Guardando archivos…"
+                  : "Crear orden · pago aún no disponible"}
             </button>
           ) : (
             <button type="submit" className="button blue" id="next">

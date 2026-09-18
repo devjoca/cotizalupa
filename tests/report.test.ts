@@ -28,6 +28,23 @@ afterEach(async () => {
 });
 
 describe("public report lookup", () => {
+  it.each([
+    ["PAYMENT_PENDING", "PAYMENT_PENDING"], ["PAID", "PROCESSING"],
+    ["PROCESSING", "PROCESSING"], ["PROCESSING_FAILED", "FAILED"],
+    ["NOT_ANALYZABLE", "FAILED"], ["REFUNDED", "REFUNDED"], ["EXPIRED", "EXPIRED"],
+  ])("shows %s as %s without exposing internal errors", async (stored, visible) => {
+    const token = newReportToken();
+    const order = await createOrder(db, { reportTokenHash: hashReportToken(token) });
+    await transition(db, order.id, "CREATED", stored, { lastError: "internal failure" });
+    expect(await loadPublicReport(db, token)).toEqual({ status: visible });
+  });
+
+  it("does not present an overdue order as payable before the monthly drain", async () => {
+    const token = newReportToken();
+    const order = await createOrder(db, { reportTokenHash: hashReportToken(token) });
+    await transition(db, order.id, "CREATED", "READY_FOR_PAYMENT", { deleteAfter: new Date(Date.now() - 1000) });
+    expect(await loadPublicReport(db, token)).toEqual({ status: "EXPIRED" });
+  });
   it("persists a completed demo report behind a new raw token", async () => {
     const saved = await createCompletedDemoReport(db, {
       perspective: "customer",

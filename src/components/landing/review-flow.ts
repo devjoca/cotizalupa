@@ -6,7 +6,7 @@ import {
 } from "#/lib/uploadLimits";
 import { OTHER_CATEGORY } from "#/lib/reviewContext";
 
-// Demo review-flow state. The dialog is cliente-only (iteration 1): the role is
+// Review-flow state. The dialog is cliente-only: the role is
 // fixed, so the reducer owns step, fields, file label, and error.
 
 export interface FlowFields {
@@ -43,7 +43,7 @@ export type FlowAction =
   | { type: "back" };
 
 export const MISSING_FILE_ERROR =
-  "Selecciona una cotización para recorrer la demostración.";
+  "Selecciona una cotización para continuar.";
 
 export const MISSING_CATEGORY_ERROR = "Elige qué estás cotizando.";
 export const MISSING_OTHER_ERROR = "Describe el servicio.";

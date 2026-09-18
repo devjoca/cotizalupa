@@ -17,7 +17,7 @@ const FAQS: Array<{ question: string; answer: string }> = [
   {
     question: "¿Necesito compartir mis datos personales?",
     answer:
-      "Puedes ocultar nombres, teléfonos, DNI/RUC y direcciones que no sean necesarios. Conserva el alcance, los montos, fechas y condiciones. Al generar el reporte, enviamos el archivo y el contexto a OpenAI. CotizaLupa no guarda el original en esta demo, pero conserva el reporte y los datos extraídos.",
+      "Puedes ocultar nombres, teléfonos, DNI/RUC y direcciones que no sean necesarios. Conserva el alcance, los montos, fechas y condiciones. Guardamos temporalmente los archivos al crear la orden y solo los enviamos a OpenAI después del pago. Eliminamos originales elegibles en una limpieza mensual. El reporte y los datos extraídos se conservan para su consulta.",
   },
   {
     question: "¿La revisión garantiza que todo está bien?",
@@ -42,7 +42,7 @@ export function Faq({ reviewsDisabled }: { reviewsDisabled: boolean }) {
           <summary>¿Puedo pagar y obtener un análisis real ahora?</summary>
           <p>{reviewsDisabled
             ? "Los pagos y las revisiones no están disponibles. Puedes explorar el formulario y ver el reporte de ejemplo."
-            : "Puedes generar un reporte gratuito con IA. Los pagos aún no están habilitados y no se te cobrará nada."}</p>
+            : "Puedes revisar tus archivos y crear una orden. No usamos IA antes del pago. El pago todavía no está habilitado, así que no se te cobrará ni se generará el reporte."}</p>
         </details>
         {FAQS.map((faq) => (
           <details key={faq.question}>

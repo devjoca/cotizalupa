@@ -1,7 +1,7 @@
 // PostgreSQL over TCP with `pg` Pool: local Docker and deployed Neon use the
 // same driver (persistent process, no serverless driver).
 // Lazy singleton: importing this module never connects, so `vite build` and
-// `vitest` pass without DATABASE_URL. See PLAN.md "Modelo de datos".
+// `vitest` pass without DATABASE_URL.
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 

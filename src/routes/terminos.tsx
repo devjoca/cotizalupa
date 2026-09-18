@@ -32,6 +32,9 @@ function TermsPage() {
           El precio previsto para una revisión pagada es de 12 USD, pago único.
           El servicio pagado todavía no está disponible y CotizaLupa no está
           aceptando cobros en esta versión de demostración.
+          Puedes revisar una vista previa y crear una orden. Solo validamos
+          los requisitos técnicos del archivo, no su contenido. Crear una orden
+          no genera un reporte ni confirma una compra.
         </p>
       </section>
 
@@ -66,8 +69,10 @@ function TermsPage() {
         <h2>Archivos y reportes</h2>
         <p>
           El usuario debe revisar que el archivo sea legible y corresponda a
-          una sola cotización. El sistema puede rechazar archivos que no pueda
-          procesar. El reporte se entrega mediante un enlace privado. El acceso
+          una sola cotización, con todas sus páginas. La IA revisará su contenido
+          después del pago. Si no podemos entregar el reporte, gestionaremos
+          el reembolso manual según la <a href="/reembolsos">política de reembolsos</a>.
+          El reporte se entrega mediante un enlace privado. El acceso
           al enlace permite leerlo, por lo que el usuario debe cuidar dónde lo
           comparte.
         </p>

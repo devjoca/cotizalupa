@@ -44,7 +44,37 @@ function ReportPage() {
   }
 
   const content =
-    result.status === "NOT_READY"
+    result.status === "READY_FOR_PAYMENT"
+      ? {
+          eyebrow: "ORDEN CREADA",
+          title: "Guardamos tus archivos.",
+          detail: `Todavía no hemos revisado su contenido. La revisión costará $${result.amountCents / 100} ${result.currency}. Los pagos todavía no están habilitados. No se ha realizado ningún cobro ni generado el reporte. Guarda este enlace para volver a consultar el estado.`,
+        }
+      : result.status === "PAYMENT_PENDING"
+      ? {
+          eyebrow: "PAGO POR CONFIRMAR",
+          title: "Estamos esperando la confirmación del pago.",
+          detail: "No vuelvas a pagar. Actualiza este enlace para consultar el estado o escribe a soporte si el pago ya se realizó.",
+        }
+      : result.status === "EXPIRED"
+      ? {
+          eyebrow: "REVISIÓN VENCIDA",
+          title: "Necesitamos que vuelvas a subir la cotización.",
+          detail: "Esta solicitud venció y ya no admite pagos. Puedes iniciar una nueva revisión desde el inicio.",
+        }
+      : result.status === "FAILED"
+      ? {
+          eyebrow: "REVISIÓN PENDIENTE DE SOPORTE",
+          title: "No pudimos completar tu reporte.",
+          detail: "Escríbenos a soporte@cotizalupa.com con el enlace de esta página para gestionar el reembolso manual. No vuelvas a pagar.",
+        }
+      : result.status === "REFUNDED"
+      ? {
+          eyebrow: "REEMBOLSO REGISTRADO",
+          title: "Hemos registrado el reembolso de esta revisión.",
+          detail: "Consulta el estado de la devolución con tu proveedor de pago. Si tienes dudas, escribe a soporte@cotizalupa.com.",
+        }
+      : result.status === "NOT_READY" || result.status === "PROCESSING"
       ? {
           eyebrow: "ANÁLISIS EN PROCESO",
           title: "Tu reporte todavía no está listo.",
@@ -74,6 +104,9 @@ function ReportPage() {
         <p className="report-state__eyebrow">{content.eyebrow}</p>
         <h1>{content.title}</h1>
         <p>{content.detail}</p>
+        {(result.status === "PAYMENT_PENDING" || result.status === "PROCESSING") && (
+          <button type="button" onClick={() => window.location.reload()}>Actualizar estado</button>
+        )}
         <a className="report-state__link" href="/">
           Volver a CotizaLupa
         </a>

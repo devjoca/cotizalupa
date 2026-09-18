@@ -5,6 +5,7 @@ import {
   hashReportToken,
 } from "#/db/orders";
 import { AnalysisSchema } from "#/lib/schemas";
+import { REVIEW_PRICE_CENTS, REVIEW_CURRENCY } from "#/lib/price";
 import { captureOperationalError } from "./monitoring";
 import type { PublicReportResult } from "./report";
 
@@ -31,6 +32,16 @@ export async function loadPublicReport(
 
   const order = await findOrderByTokenHash(db, hashReportToken(token));
   if (!order) return { status: "NOT_FOUND" };
+
+  if (order.status === "READY_FOR_PAYMENT" || order.status === "PAYMENT_FAILED") {
+    if (order.deleteAfter <= new Date()) return { status: "EXPIRED" };
+    return { status: "READY_FOR_PAYMENT", amountCents: REVIEW_PRICE_CENTS, currency: REVIEW_CURRENCY };
+  }
+  if (order.status === "PAYMENT_PENDING") return { status: "PAYMENT_PENDING" };
+  if (order.status === "PAID" || order.status === "PROCESSING") return { status: "PROCESSING" };
+  if (order.status === "EXPIRED") return { status: "EXPIRED" };
+  if (order.status === "REFUNDED") return { status: "REFUNDED" };
+  if (order.status === "PROCESSING_FAILED" || order.status === "NOT_ANALYZABLE") return { status: "FAILED" };
 
   const report = await findReportByOrderId(db, order.id);
   if (!report) {

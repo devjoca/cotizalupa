@@ -333,7 +333,8 @@ const client = (override?: OpenAI): OpenAI => override ?? (shared ??= new OpenAI
 // analysis. The fixture is typed as Analysis and labeled [STUB] so it cannot
 // pass as a real report.
 function isStubEnabled(): boolean {
-  return process.env.AI_STUB === "1";
+  // A stub must never qualify a real document for payment.
+  return process.env.NODE_ENV !== "production" && process.env.AI_STUB === "1";
 }
 
 const STUB_ANALYSIS: Analysis = {

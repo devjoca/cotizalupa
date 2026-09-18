@@ -65,7 +65,7 @@ function Landing() {
         <div className="availability-note" role="status">
           {reviewsDisabled
             ? "Las revisiones aún no están disponibles. Explora el formulario o mira el reporte de ejemplo. No se enviarán archivos ni se realizarán cobros."
-            : "Demo gratuita con IA. Aún no se realizan cobros. Precio previsto al habilitar pagos: $12 USD por revisión."}
+            : "Revisa tus archivos y crea una orden. La IA analizará después del pago. Los pagos aún no están habilitados. Precio previsto: $12 USD por revisión."}
         </div>
         <Hero onStart={startFlow} />
         <div className="category-strip">

@@ -24,9 +24,8 @@ changes — do not append a second account.
 | AWS S3 client | (bucket adapter) | 3.1130.0 | Railway Buckets expose an S3-compatible API |
 | Vitest | 5 | ^5.0.1 (lockfile: 5.0.1) | exact pin fought pnpm 12's 24h minimum-release-age policy on publish day (D3) |
 
-Rule going forward: versions float within PLAN's majors unless a
-known-bad interaction says otherwise. New divergences go in the log below,
-not in `PLAN.md`.
+Rule going forward: retain these versions unless a concrete constraint requires
+a change. Approved product decisions update PLAN.md and this record together.
 
 ## Decision log
 
@@ -95,8 +94,8 @@ idempotency + immutability, commits only on explicit ask.
 Mockup and early copy said S/20. That covers inference + a cheap gateway
 and then loses money once Meta Ads is the acquisition channel. $12 USD is
 the launch willingness-to-pay (about S/39 at 3.40, reference only). Live landing shows $12 USD.
-`docs/mockup/` stays S/20 as the visual baseline — do not "fix" it. Meta
-CAPI is needed (Purchase only on `PAID`). Do not change the ticket in
+`docs/mockup/` stays S/20 as the visual baseline. Meta CAPI is a separate next
+integration after Paddle, Purchase only for verified paid orders. Do not change the ticket in
 code without updating this decision and `docs/pricing.md`.
 
 ### D8 — Paddle is the MVP payment rail (2026-09-15, updated 2026-09-17)
@@ -104,7 +103,8 @@ MVP hypothesis is “will someone pay ~$12?”, not “can we operate Peruvian
 payments.” Paddle does not provide preliminary assessments or preapproval by
 email. Eligibility is pending the Paddle application, a live HTTPS domain, and
 review of the functional product. Once accepted, checkout is Paddle (MoR):
-pre-check → Paddle → webhook `PAID` → analyze. We still have renta and
+local preview → mechanical validation → Paddle → webhook `PAID` → analyze.
+There is no prepayment model call in the approved POC. We still have renta and
 the monthly 621; we do not emit a boleta per consumer in this path.
 Exportación de servicios and IGV on a non-domiciled MoR fee are
 accountant questions, not assumptions.
@@ -114,8 +114,8 @@ order/amount/currency, deduplicate `provider_event_id`, and allow `PAID` only
 from `PAYMENT_PENDING`. Economics and the Paddle application questions live in
 `docs/pricing.md`.
 
-### D9 — Free POC uses one AI pass; payment remains blocked (2026-09-16)
-The free POC runs submit → persisted `/r/{token}` report with no payment and no
+### D9 — Free POC used one AI pass (2026-09-16, superseded by D16)
+The original free POC ran submit → persisted `/r/{token}` report with no payment and no
 AI pre-payment gate. A successful synchronous analysis atomically creates a
 terminal demo order and its report, then returns the raw token only to the
 browser for navigation. It persists neither the original nor the user's concern.
@@ -123,8 +123,8 @@ The backend still rejects mechanically invalid uploads before model spend: one
 PDF of at most 10 pages, or 1–10 JPG/PNG images, 25 MiB combined, real MIME,
 readable/unencrypted PDF, server-computed SHA-256. The single Astra pass checks
 the commercial unit and produces the report. This is not the paid design: a
-cheap pre-check must return before checkout so we never charge for an illegible,
-non-quotation, or multi-quotation document.
+cheap pre-check was originally planned before checkout. D16 supersedes that
+design with local preview and post-payment suitability checks plus manual refunds.
 
 The POC model boundary lives in `src/server/ai.ts`: `store: false`, 16,000 total
 output/reasoning tokens, a 180 s timeout, one retry, strict JSON schema, and a
@@ -139,7 +139,7 @@ Spend protection stays in memory to preserve the one-process design: 10
 requests per IP per hour and at most two simultaneous model calls. These limits
 reset on deploy and are intentionally not distributed.
 
-### D10 — Manual recovery, 30-day ceiling, minimal Sentry (2026-09-16)
+### D10 — Manual recovery, monthly deletion, minimal Sentry (2026-09-16, revised for paid POC)
 There is no interval. The phase 3 webhook will call `processNext()` after
 responding 200; `pnpm ops:drain` is the manual backstop run monthly or after a
 Sentry alert. It expires old unpaid orders, repairs exhausted processing,
@@ -147,11 +147,15 @@ drains claimable work, lists stale payments for manual Paddle reconciliation,
 lists every existing paid analysis failure, deletes due originals, and exits
 nonzero when manual work remains. It never guesses that a pending payment failed.
 
-Every order starts with a 30-day `delete_after`. Safe terminal states shorten
-the deadline to now; paid failures retain the original ceiling for recovery or
-refund. Every terminal transition clears `user_context`. The sweep only accepts
+Every order starts with a 30-day `delete_after` eligibility date. Safe terminal
+states advance eligibility to now; paid failures retain the original date for
+recovery or refund. Every terminal transition clears `user_context`. The sweep only accepts
 terminal statuses, so a bad date cannot delete a pending or processing original.
-Physical deletion occurs on the next manual drain after the deadline.
+Physical deletion occurs on the next manual drain after eligibility. There is
+no 30/35-day physical-deletion guarantee. A monthly sweep can retain a newly
+eligible unpaid original until the following month's sweep. Review pending
+payments in Paddle; never let an unresolved payment become indefinite retention.
+Paid failures require attention during pilot operation, not just monthly cleanup.
 
 Sentry is the one approved infrastructure exception. The server SDK captures
 sanitized operational errors only. Default integrations, PII, request data,
@@ -179,10 +183,10 @@ undecided and are not part of this phase.
 ### D13 — Review shutdown flag (2026-09-17)
 
 Phase 2 includes the server-only `REVIEWS_DISABLED` flag. Only the exact value
-`true` disables the free review flow: the final submit is disabled in the UI,
-and the server analysis endpoint rejects before processing. When unset or set
-to any other value, the existing free POC remains available. Existing reports
-and jobs are unaffected. This flag does not enable paid reviews. The internal
+`true` disables submission: the final submit is disabled in the UI,
+and the server endpoint rejects before processing. When unset or set
+to any other value, mechanical validation and order preparation are available. Existing reports
+and jobs are unaffected. This flag does not enable payments. The internal
 `/analyze` prompt-testing page, its renderer, and its non-persisting endpoint
 were removed; the landing flow is the only review submission path.
 
@@ -191,8 +195,9 @@ were removed; the landing flow is the only review submission path.
 Phase 4 public policy work was approved and brought forward. Privacy, terms,
 refunds, and contact pages are implemented with `soporte@cotizalupa.com` for
 support/privacy requests and Jose Carlos Pereyra Leon as the operator. Verify
-the mailbox works before submission. These pages describe the current free
-POC separately from the future paid service; the product is not launch ready.
+the mailbox works before submission. These pages now describe local preview,
+technical validation, post-payment AI, manual refunds, temporary storage and monthly deletion separately from the unavailable paid
+service; the product is not launch ready.
 
 ### D15 — Five files, any mix; amount_cents is bigint (2026-09-18)
 
@@ -200,8 +205,7 @@ Mechanical limit is now at most 5 files per order, any mix of PDF/JPG/PNG
 (25 MiB combined, 10 pages per PDF, real MIME, server-computed SHA-256).
 The single-PDF-or-images split and its `MIXED_FILE_TYPES` rejection are gone:
 multi-page phone photos of one quotation kept tripping the old rule, and one
-uniform cap is simpler to explain than two. Diverges from PLAN's "10
-pages / 10 imágenes" — PLAN stays as written, this entry is the record.
+uniform cap is simpler to explain than two. The paid-POC PLAN now reflects this limit.
 Watch the cost side: five 10-page PDFs is 50 pages of model input; tighten
 with a total-page cap if spend says so.
 
@@ -215,26 +219,72 @@ missing/corrupt stored files) fail the order immediately as
 mapping lives once in `uploadLimits.ts`; the `analyze.ts` size estimate is
 gone (`validateAnalysisFiles` is the one gate).
 
+### D16 — Local preview, pay first, then Astra
+
+Joca approved removing the cheap-model pre-check from the paid POC. The final
+form step previews local images and opens PDFs without uploading them. The user
+can remove files or return to replace them before order creation. Warn about
+complete, legible input and one quotation, but do not claim the preview or
+technical validation certifies its content. Until Paddle is integrated, the
+button creates an order and explicitly says payment is unavailable.
+
+Mechanical validation still checks MIME, size, PDF parsing/encryption, pages
+and SHA-256. Invalid input leaves no persisted order or document. Valid input creates a
+CREATED order and complete file manifest in one transaction, then writes the
+bucket, then becomes READY_FOR_PAYMENT. Failed writes leave tracked keys and a
+REJECTED order; interrupted CREATED uploads expire through the existing drain.
+No edit endpoint exists, and file registration locks the order and refuses
+anything past CREATED. The original free report helper remains internal for
+existing tests; no public endpoint can run Astra without payment.
+
+The existing private report link shows payment-ready, pending, processing,
+expired, failed and refunded states. Checkout remains explicitly unavailable.
+The $12 USD review ticket is server-owned and distinct from the order's
+approximate quotation amount in PEN. Paddle must use the former for verification.
+No model runs during preparation. The pre-check request, configuration and
+dedicated tests are removed, not feature-flagged. The nullable precheck_result
+column remains unused; no migration is needed. The two-request admission
+limit covers decoding, validation and storage; HTTP transport
+buffering still needs deployed-size verification.
+
+Astra checks document suitability and generates the report only after verified
+payment. NOT_ANALYZABLE is an expected paid-input failure, not a broken pre-check.
+Do not save a fabricated report or retry unsuitable input. Handle a full refund
+manually through the provider, then conditionally mark REFUNDED. This replaces
+the earlier rule promising no payment for unprocessable content. Existing
+recovery and failure visibility stay. Model stubs remain disabled in production.
+The paid eval command and runner were removed at Joca's request. Synthetic
+fixtures remain for free deterministic tests; review a few model-generated
+reports manually before selling. The form describes CotizaLupa analyzing the
+files after payment; AI processing and the provider are disclosed in the linked
+privacy policy, without implying files stay exclusively on our servers.
+
+New payment events retain operational metadata only; the legacy payload column receives `{}`.
+Only the verified webhook will write PAID, atomically with the event insert.
+The browser return is read-only. Checkout duplication/provider-timeout handling
+belongs to the Paddle integration. CAPI is the subsequent separate integration.
+
 ## Phase status
 
 - [x] 0. Scaffold (this file's baseline)
-- [ ] 1. Core: DB layer, generated migration, Docker PostgreSQL lifecycle tests, bucket
-  read/delete adapter, and mechanical validation are built. Still open:
-  `pnpm db:migrate` on dev, presigned upload, persisted order flow, pre-check
-- [ ] 2. Producto: Astra → Zod, `processNext()`, and persisted `/r/{token}`
-  rendering are built. `REVIEWS_DISABLED` is available for the free POC.
-  Still open: wiring the paid order flow
-- [ ] 3. Money: Paddle adapter, verified idempotent webhook/return path, and
-  checkout file freeze. Meta CAPI is still needed (`Purchase` on `PAID` only).
+- [x] 1. Core implementation: direct upload, mechanical validation,
+  tracked bucket writes and payment-ready orders, with no prepayment AI. Local PostgreSQL
+  tests apply the migrations to isolated databases; no production migration is implied.
+- [x] 2. Product implementation: Astra → Zod, processNext(), persisted report,
+  private order-state page, local file preview and file immutability. REVIEWS_DISABLED gates submission.
+- [ ] 3. Money: Paddle acceptance, checkout/session recovery, authenticated
+  transactional webhook, browser-return refresh and sandbox payment tests.
+  CAPI follows as a separate integration; no quotation content in attribution.
 - [ ] 4. Producción: sweep/retry mechanisms are built and the public policy
   pages are implemented. Still open: mailbox verification,
-  deployment runbook validation, and sandbox-to-live charge/refund sign-off.
+  deployed upload limits, manual report-quality review,
+  deployment verification, and owner sandbox-to-live charge/refund sign-off.
 
 ## Open questions
 
 Paddle application and live-domain review, before writing `payments.ts`:
 one-shot USD? signed webhook + retries + stable event id? checkout only after
-pre-check? refunds? invoice language + LATAM VAT/IGV? Peru-resident payouts?
+technical file validation? refunds? invoice language + LATAM VAT/IGV? Peru-resident payouts?
 ToS vs AI/document-upload.
 
 Accountant, before first live charge: CotizaLupa→Paddle booking;

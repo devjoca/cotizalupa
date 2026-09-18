@@ -9,6 +9,8 @@ export type PublicReportResult =
   | { status: "NOT_FOUND" }
   | { status: "NOT_READY" }
   | { status: "UNAVAILABLE" }
+  | { status: "READY_FOR_PAYMENT"; amountCents: number; currency: string }
+  | { status: "PAYMENT_PENDING" | "PROCESSING" | "EXPIRED" | "FAILED" | "REFUNDED" }
   | { status: "COMPLETED"; analysis: Analysis };
 
 export const getPublicReport = createServerFn({ method: "GET" })

@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import {
   DeleteObjectCommand,
   GetObjectCommand,
+  PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
 
@@ -16,6 +17,7 @@ import {
 import { isAllowedMime, mimeToExtension } from "#/lib/uploadLimits";
 import type { AnalysisInputFile } from "./ai";
 import { captureOperationalError } from "./monitoring";
+import type { ValidatedAnalysisFile } from "./validation";
 
 // Deterministic order data: no retry will fix a missing file, a bad stored
 // MIME, or an integrity mismatch, so the caller fails the order immediately
@@ -65,6 +67,19 @@ async function objectBytes(blobPath: string): Promise<Uint8Array> {
   );
   if (!object.Body) throw new Error("bucket object has no body");
   return object.Body.transformToByteArray();
+}
+
+// The order and manifest must be committed before this write. Even a crashed
+// request then leaves a tracked object for the monthly drain.
+export async function writeOriginal(file: OrderFile, validated: ValidatedAnalysisFile) {
+  const { bucket, client } = bucketConfig();
+  await client.send(new PutObjectCommand({
+    Bucket: bucket,
+    Key: file.blobPath,
+    Body: Buffer.from(validated.dataBase64, "base64"),
+    ContentType: validated.mime,
+    IfNoneMatch: "*",
+  }));
 }
 
 export async function loadAnalysisFiles(

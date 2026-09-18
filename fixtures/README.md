@@ -1,15 +1,15 @@
-# Eval fixtures (pnpm eval — calls the model, costs money, run by hand)
+# Synthetic analysis cases
 
-Drop the 8 PDFs from PLAN.md "Tests" here:
+`analysis.ts` generates PDFs in memory: normal quotation, missing price, options,
+annex, multiple quotations, invoice, empty/unreadable input, ten-page quotation,
+two providers in separate files, and an invoice containing prompt injection.
+These replace the previously listed but absent eight PDFs. They are deliberately
+simple synthetic cases, not a claim of real-world OCR or report-quality coverage.
 
-- normal-quotation.pdf
-- quotation-without-price.pdf
-- quotation-with-options.pdf
-- quotation-with-annex.pdf
-- multiple-quotations.pdf
-- invoice.pdf
-- unreadable.pdf
-- ten-page-quotation.pdf
+`pnpm test tests/validation.test.ts` validates every generated file locally
+without calling AI. The order-flow tests also use a synthetic invoice to verify
+post-payment failure and manual-refund bookkeeping.
 
-The eval runner prints hits over total. Guideline 9/10, not a strict pass/fail.
-// TODO: phase 2 — eval/analysis.eval.ts
+There is no paid eval runner. Review a few model-generated reports manually
+before selling. Add synthetic equivalents of useful failure cases to tests;
+never copy customer originals here.

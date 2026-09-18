@@ -32,8 +32,9 @@ function RefundsPage() {
         <p>
           Si un pago futuro se completa y CotizaLupa no puede entregar el
           reporte correspondiente, reembolsaremos el importe total de esa
-          revisión. Esto cubre, por ejemplo, un fallo del servicio que impida
-          completar el análisis después del cobro.
+          revisión. Esto incluye archivos cuyo contenido no podamos analizar
+          y fallos del servicio que impidan completar el análisis después del
+          cobro. Gestionamos estos reembolsos manualmente, no de forma automática.
         </p>
         <p>
           El servicio corresponde a una revisión de una cotización. La
