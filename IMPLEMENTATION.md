@@ -8,8 +8,8 @@ changes — do not append a second account.
 
 | Layer | PLAN said | We run | Why different |
 |---|---|---|---|
-| TanStack Start | 1.168 | `@tanstack/react-start` 1.168.54 (latest) | — |
-| TanStack Router | (implied 1.168) | `@tanstack/react-router` 1.170.36 | react-start@1.168.54 declares exactly this; our own 1.168.26 pin loaded a second copy and 500'd dev SSR (D2) |
+| TanStack Start | 1.168 | `@tanstack/react-start` 1.168.60 | Security fix for CVE-2026-102989 (D17) |
+| TanStack Router | (implied 1.168) | `@tanstack/react-router` 1.170.41 | Matches the exact version required by react-start@1.168.60; mismatches can load duplicate copies and 500 dev SSR (D2) |
 | React | 19.3 | 19.3.0 | — |
 | Node | 24 LTS | 24.16.0, `.nvmrc` = `24`, `engines >= 24` | — |
 | pnpm | (implied current) | 12.4.1 via mise `pnpm@latest`, `packageManager` pinned | Shell had 9.15.4; scaffold workspace format needs ≥10 (D1) |
@@ -29,6 +29,19 @@ known-bad interaction says otherwise. New divergences go in the log below,
 not in `PLAN.md`.
 
 ## Decision log
+
+### D17 — Patch TanStack Start reflected XSS (2026-09-30)
+
+The resolved `@tanstack/react-start@1.168.54` and
+`@tanstack/start-server-core@1.169.35` were affected by CVE-2026-102989, an
+unauthenticated reflected XSS in server-function responses. A crafted link
+could make the app return attacker-controlled HTML from its own origin when a
+visitor opened it. Upgrade to `@tanstack/react-start@1.168.60`, which resolves
+`@tanstack/start-server-core@1.169.39`, the fixed version. Align the direct
+Router pin to `1.170.41`, the exact version required by this Start release, to
+avoid loading duplicate Router copies. pnpm's minimum-release-age policy
+records the exact TanStack package versions used by this fix in
+`pnpm-workspace.yaml`.
 
 ### D1 — pnpm 12 via mise (2026-09-15)
 Scaffold's `pnpm-workspace.yaml` (`allowBuilds` format) is unreadable by the
