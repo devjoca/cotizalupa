@@ -1,0 +1,31 @@
+{
+  "name": "@cotizalupa/web",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#/*": "./src/*"
+  },
+  "scripts": {
+    "dev": "vite dev --port 3002 --strictPort",
+    "generate-routes": "tsr generate",
+    "build": "vite build && vite build --ssr src/prerender.tsx --outDir node_modules/.prerender --emptyOutDir && node scripts/prerender.mjs",
+    "preview": "vite preview",
+    "preview:pages": "wrangler pages dev dist --port 3002",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tanstack/react-router": "1.170.41",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@tanstack/router-cli": "^1.132.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^6.0.1",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.0",
+    "wrangler": "^4.147.0"
+  }
+}

@@ -1,174 +1,86 @@
 # Pricing
 
-Decided 2026-09-15 (ticket) and 2026-09-15 (rail). Price and payment
-provider are product decisions. `PLAN.md` does not freeze either. Do not
-change the number or the rail in code without updating this file and
-`IMPLEMENTATION.md` (D7, D8).
+The launch ticket is $12 USD for one review of one quotation. It is a one-time
+purchase. This file owns the ticket and the payment rail; change it and
+`AGENTS.md` together.
 
-## The experiment
+## Experiment
 
-The MVP hypothesis is **willingness to pay**, not “can we operate Peruvian
-payments optimally.”
+We are testing whether a person will pay $12 for a useful report before
+accepting a quotation. The landing shows $12 USD.
 
-| | |
-|---|---|
-| Hypothesis | A person pays ~**$12** for one CotizaLupa review |
-| Checkout (MVP) | **Paddle**, pending application and live-domain product review |
-| Display on the live landing | **$12 USD** (Paddle charges in USD) |
-| Recurrence | One-shot. No subscription, no second charge |
+## Polar checkout
 
-`$12 USD` is the ticket (about S/39 at USD/PEN 3.40, shown for reference only). One paid order = one quotation = one report.
-That does not change with the rail.
-
-Do not recopy `docs/mockup/` onto the live landing. The mockup still says
-S/20; that is the visual baseline, not the price.
-
-## Why this ticket (not 20, 29, or 49)
-
-Acquisition is Meta Ads. SUNAT and the gateway do not force the number. Ads do.
-
-- **S/20** (mockup) covers inference + a cheap gateway and then loses
-  money at a normal Meta CPA. Do not launch ads at S/20.
-- **S/29** only works if CAC stays near S/12, which a new pixel will not
-  deliver in week one.
-- **$12 USD** is still tiny next to the mockup quote (S/3,800) or a
-  50% adelanto (S/1,900). At a base CAC of S/20 it keeps a thin leftover
-  even if Astra hits the $1 cap. That is the launch ticket.
-- **S/49** is the A/B, not the default.
-
-Paddle's exact take remains pending its written quote. The MVP accepts the MoR
-premium to keep consumer invoicing and payment-tax handling out of the product.
-
-## MVP rail — Paddle (MoR)
-
-Paddle is the seller to the customer. Flow we want:
+Joca confirmed Polar approved CotizaLupa. Polar is the Merchant of Record and
+the only MVP payment rail. The product must be a one-time, fixed-price USD 12
+product with tax-inclusive pricing, with discount codes and trials disabled.
+The buyer's total must stay at $12 after tax. Configure its product ID,
+organization access token, signed webhook secret, sandbox or production mode,
+and public app URL on the server. No provider credentials go to the browser or
+repository.
 
 ```
-local preview → upload → mechanical validation → Paddle checkout
-→ webhook paid → analyze → /r/{token}
+local preview → upload → mechanical validation → private order link
+→ Polar checkout → signed order.paid → analysis → persisted /r/{token}
 ```
 
-Concentrate the MVP on landing → Purchase conversion → perceived report
-quality. Do not build a facturador or second checkout to learn whether anyone
-pays $12.
+The user confirms that the files are legible, complete, and from one provider.
+Mechanical validation rejects unsupported, unreadable PDFs, invalid image
+headers, and oversized files before checkout. It does not determine whether the content is a suitable
+quotation. Every paid order gets a best-effort report; unsuitable content is
+reported with gaps, not rejected after payment. Manual refunds cover system
+failures only. The original Polar fee may remain a
+cost to us.
 
-### What Paddle does not erase
+The [Polar Checkout API](https://polar.sh/docs/features/checkout/session)
+registers one payable session per order. Its metadata carries only our order ID.
+The API returns its URL only after registering the checkout ID in the database.
+Reuse an open registered session. If creation or registration fails before the
+URL is returned, the API releases the order back to READY_FOR_PAYMENT; the manual
+drain recovers abandoned unregistered freezes after 15 minutes. A provider-
+confirmed expired or failed session closes the order as EXPIRED. The
+browser return only reads state. The signed
+[`order.paid` event](https://polar.sh/docs/api-reference/webhooks/order.paid)
+changes an order to PAID only after checking the registered checkout ID, product,
+order ID, paid status, $12 subtotal and total, no discount, and USD currency. Insert the
+unique event and change state in one DB transaction. Store only event metadata;
+`payment_events.payload` receives `{}`.
 
-Paddle invoices the customer and takes on consumer-facing sales tax where
-they operate. **You still have Peruvian renta and monthly declarations
-(621).** Confirm with the accountant, in writing:
+Polar's [public fees](https://polar.sh/docs/merchant-of-record/fees) list Starter
+at 5% + $0.50 per transaction, plus 1.5% for non-US cards. At $12, those two
+fees would be $1.28 before payout costs, taxes, or other fees. Confirm the
+actual account plan before using this estimate for decisions. Polar says the
+initial transaction fee is not returned to the seller after a refund.
 
-1. How to book CotizaLupa → Paddle (payouts in, their invoice/fees out).
-2. Whether this is **exportación de servicios**. SUNAT requires four
-   conditions at once, including utilization abroad. Do not assume it.
-3. Whether Paddle’s fee is a service used in Peru from a non-domiciled
-   supplier. SUNAT has a 2026 procedure to declare/pay that IGV. Do not
-   skip it because “MoR handles tax.”
+Polar handles the buyer checkout and its applicable sales tax as Merchant of
+Record. This does not settle CotizaLupa's Peruvian income tax, monthly filings,
+exportación de servicios, or IGV treatment of the foreign provider fee. Ask the
+accountant before the first live charge. Do not build a Peruvian invoicing API
+for this experiment without a separate decision.
 
-621 is monthly. Nobody should be in SUNAT daily. Per-customer CPE is
-what Paddle removes from the product, not the monthly filing.
+## Operations
 
-### Paddle application and product review
+- No real charge or refund as an agent test. Use sandbox, deterministic payment
+  tests, and owner sign-off before live charges.
+- A signed event with wrong amount, currency, product, order ID, or checkout ID
+  must never mark PAID. A duplicate event answers 200 and stops.
+- `PAYMENT_PENDING` with a checkout ID requires provider reconciliation.
+  Without a checkout ID, no payable URL was returned; the manual drain releases
+  that abandoned freeze after 15 minutes. Never expire a registered checkout
+  merely because time passed.
+- Manual refunds (system failures only) happen in Polar first, then the conditional DB transition to
+  REFUNDED. No automatic refund path.
+- Meta CAPI Purchase follows as a separate integration after payment, once
+  approved. It uses verified paid orders only and no quotation content.
+- The report stays as JSON and facts in Postgres. `/r/{token}` renders it and
+  offers browser print-to-PDF. Resend emails the private link after the report
+  is saved. No server PDF renderer or generated attachment.
 
-Paddle does not provide preliminary assessments or preapproval by email. Apply
-with a live HTTPS domain and a functional product for their review. Payment
-eligibility remains pending that application and domain review. Keep the
-questions below for the application and the written record of the outcome
-before writing `src/server/payments.ts`.
+## Cost guardrails
 
-> Planned paid service: CotizaLupa is a one-shot digital product. The customer uploads one
-> quotation (PDF or photos), previews it and submits it for technical validation, then pays
-> ~USD 12 once (card) and receive a report URL: what is clear, missing,
-> risky, and which questions to ask. No account, no subscription, no
-> physical goods. Initial ads: Spanish, Peru, then other LATAM.
->
-> There is no AI pre-check. We ask customers to send one complete, legible quotation.
-> We check content only after payment; unsuitable input can require a manual refund.
-> If payment succeeds but we cannot deliver the report, we refund the full
-> review price. We do not persist payment-provider DNI, address, card, or billing.
->
-> Please address these points in the application or review:
-> 1. You accept this product (document upload + AI analysis report).
-> 2. One-shot USD checkout (not subscription) is supported.
-> 3. Webhook: signed, retry policy, stable event id, amount + currency
->    in the payload, sandbox vs live.
-> 4. We can open checkout only after technical file validation passes, and bind the
->    Paddle order to our `orders.id`.
-> 5. Refunds: dashboard and/or API; whether your fee is returned.
-> 6. Customer invoice language (Spanish?) and whether you collect/remit
->    Peru IGV / Mexico IVA / Colombia IVA for digital services.
-> 7. Restricted countries and whether Peru-resident sellers can receive
->    payouts.
-> 8. Anything in the ToS that bans AI, document processing, or ads-driven
->    consumer checkout.
-
-## Payment ledger
-
-Provider is an adapter. These rules do not change:
-
-- No checkout until files pass mechanical validation and are stored. Files freeze at `PAYMENT_PENDING`.
-- Verify authenticity, success, `order id`, amount, and currency before
-  any state change.
-- `payment_events.provider_event_id` UNIQUE; duplicates return 200 and stop.
-- `PAID` only from `PAYMENT_PENDING`. Zero rows = no-op.
-- Event insertion and the paid transition commit together. The browser return
-  only reads status; only a verified webhook writes PAID.
-- Checkout retries must not duplicate charges, including provider timeouts.
-- Match the registered transaction ID and the server-owned $12 USD ticket.
-  `orders.amount_cents` is the quotation's approximate amount in PEN, not the fee.
-- Persist event metadata only. The legacy payload column receives `{}`.
-- No payment-provider DNI, address, card, or billing in the database.
-- Refunds: provider dashboard/API, then `status = 'REFUNDED'`. No
-  auto-refund code in the MVP.
-- CAPI remains a separate next integration after Paddle. Send **Purchase** only
-  for a verified paid order, deduplicated by order. No Meta pixel on `/r/{token}`.
-
-`orders.payment_provider` and `payment_events.provider` exist so the
-adapter can change without a new order model.
-
-## Assumptions (2026-09-15)
-
-| Input | Value | Source / note |
-|---|---|---|
-| USD/PEN | 3.40 | ~3.36 on 2026-09-02; rounded up |
-| UIT 2026 | S/5,500 | D.S. 301-2025-EF |
-| Inference cap | **$1.00 = S/3.40** | Worst case we budget, not the mean |
-| Typical Astra medium | $0.25–$0.70 | 2–4 page quotation |
-| Peru Meta CPC | S/0.30–S/1.50 | Local 2026 ranges |
-| Peru conversion CPA | S/15–S/45 | Cold conversion |
-| Paddle take | Pending written quote | MoR premium; do not invent the rate |
-
-## Meta CAC (unchanged by the rail)
-
-CAC is cash to Meta per **paid** order. Abandoned uploads and refunded orders still cost the
-click; refunds can also cost inference and provider fees.
-
-| Scenario | CAC | When |
-|---|---:|---|
-| Good | S/12 | Strong creative, quote in hand, pixel trained |
-| Base | S/20 | Cold conversion after a few weeks |
-| Harsh | S/35 | Learning, weak creative, many rejects |
-
-Break-even CAC depends on Paddle's written quote and FX. Price for 2–4%
-click → pay, not 7%. Learning-phase losses are funded with cash, not by
-cutting the sticker to S/20.
-
-Meta often needs ~50 purchases/week to leave learning (~S/7,000/month
-media at harsh CAC). Agency fees extra. Accountant treats Meta IGV.
-
-## Guardrails so $1 stays $1
-
-- Analysis: Astra, `reasoning_effort: medium`. Never `high` in the MVP.
-- No model before payment. Manually review a few generated reports before launch.
-- Five mixed PDF/JPG/PNG files, 25 MiB combined, 10 pages per PDF. Five PDFs
-  can reach 50 pages; the $1 figure above is a budget assumption, not an enforced cap.
-- Keep existing usage metadata. No new cost telemetry or dashboard before sales;
-  `reports.cost_usd` remains nullable until prices are explicitly configured.
-- Never spend Astra before money clears.
-
-## What this file does not decide
-
-- Accountant’s Paddle booking, exportación, and non-domiciled IGV.
-- Accountant’s Meta-as-import treatment.
-- A/B S/49 after the pixel has data.
-- Nubefact or any billing API.
+GPT-6.1 Sol runs only after verified payment, at medium reasoning effort by default. The current
+file cap is five PDF/JPG/PNG files, 25 MiB combined, ten pages per PDF. Five PDFs
+could mean 50 pages of model input, so the prior $1 analysis cap is a budget
+assumption, not an enforced limit. Review real model-generated reports manually
+before selling and tighten the page cap if spend requires it. Keep the existing
+usage metadata; do not add a cost dashboard before sales.

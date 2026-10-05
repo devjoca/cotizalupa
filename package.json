@@ -2,52 +2,28 @@
   "name": "cotizalupa",
   "private": true,
   "type": "module",
-  "imports": {
-    "#/*": "./src/*"
-  },
   "scripts": {
-    "dev": "vite dev --port 3000",
-    "generate-routes": "tsr generate",
-    "build": "vite build",
-    "preview": "vite preview",
-    "start": "node .output/server/index.mjs",
-    "dev:infra": "docker compose up -d postgres minio minio-init",
+    "dev": "concurrently --kill-others --kill-others-on-fail \"pnpm dev:web\" \"pnpm dev:server\"",
+    "dev:web": "pnpm --dir web dev",
+    "generate-routes": "pnpm --dir web generate-routes",
+    "build": "pnpm --dir web build",
+    "preview": "pnpm --dir web preview",
+    "preview:pages": "pnpm --dir web preview:pages",
+    "start": "cd api && { if [ -f .env ]; then set -a; . ./.env; set +a; fi; } && go run ./cmd/cotizalupa",
+    "dev:server": "cd api && { if [ -f .env ]; then set -a; . ./.env; set +a; fi; } && PORT=3001 go run ./cmd/cotizalupa",
+    "dev:infra": "docker compose up -d postgres rustfs rustfs-init",
     "dev:infra:down": "docker compose down",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
-    "ops:drain": "tsx --env-file-if-exists=.env scripts/ops-drain.ts",
-    "test": "vitest run"
+    "db:migrate": "cd api && { if [ -f .env ]; then set -a; . ./.env; set +a; fi; } && go run ./cmd/cotizalupa migrate",
+    "ops:drain": "cd api && { if [ -f .env ]; then set -a; . ./.env; set +a; fi; } && go run ./cmd/cotizalupa drain",
+    "test:go": "cd api && go test ./...",
+    "test:go:db": "cd api && COTIZALUPA_LOCAL_DB_TEST=1 go test -count=1 ./...",
+    "db:create": "cd api && go run ./cmd/cotizalupa migration-create"
   },
   "packageManager": "pnpm@12.4.1",
   "engines": {
     "node": ">=24"
   },
-  "dependencies": {
-    "@aws-sdk/client-s3": "3.1130.0",
-    "@sentry/node": "10.74.0",
-    "@tanstack/react-router": "1.170.36",
-    "@tanstack/react-start": "1.168.54",
-    "drizzle-orm": "0.45.2",
-    "file-type": "22.1.0",
-    "nitro": "3.0.260610-beta",
-    "openai": "7.15.0",
-    "pg": "8.23.0",
-    "react": "19.3.0",
-    "react-dom": "19.3.0",
-    "unpdf": "1.8.1",
-    "zod": "4.6.5"
-  },
   "devDependencies": {
-    "@tanstack/router-cli": "^1.132.0",
-    "@types/node": "^24.0.0",
-    "@types/pg": "8.15.0",
-    "@types/react": "^19.2.0",
-    "@types/react-dom": "^19.2.0",
-    "@vitejs/plugin-react": "^6.0.1",
-    "drizzle-kit": "0.31.10",
-    "tsx": "4.23.13",
-    "typescript": "^6.0.2",
-    "vite": "^8.0.0",
-    "vitest": "^5.0.1"
+    "concurrently": "^9.2.1"
   }
 }

@@ -1,0 +1,26 @@
+# Report routes serve the prerendered shell for /r/{token}. Headers are declared
+# on every path the request can take: redirects run before headers, and Pages
+# normalizes /report-shell.html to the extensionless /report-shell, so the
+# rule must cover all three or the final 200 loses no-store and noindex.
+# Unknown paths keep the top-level 404.html; there is no SPA fallback.
+/r/*
+  X-Robots-Tag: noindex, nofollow
+  Cache-Control: no-store
+
+/report-shell.html
+  X-Robots-Tag: noindex, nofollow
+  Cache-Control: no-store
+
+/report-shell
+  X-Robots-Tag: noindex, nofollow
+  Cache-Control: no-store
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Preview deployments must never be indexed, on any project or version domain.
+https://:project.pages.dev/*
+  X-Robots-Tag: noindex
+
+https://:version.:project.pages.dev/*
+  X-Robots-Tag: noindex

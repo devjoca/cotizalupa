@@ -1,15 +1,14 @@
-# Synthetic analysis cases
+# Synthetic test documents
 
-`analysis.ts` generates PDFs in memory: normal quotation, missing price, options,
-annex, multiple quotations, invoice, empty/unreadable input, ten-page quotation,
-two providers in separate files, and an invoice containing prompt injection.
-These replace the previously listed but absent eight PDFs. They are deliberately
-simple synthetic cases, not a claim of real-world OCR or report-quality coverage.
+`valid-tiny.jpg` is a tiny synthetic JPEG. Everything else is generated in memory
+by the Go tests (`api/internal/app/testsupport_test.go`): one-page and multi-page PDFs,
+PNGs, and the malformed or oversized variants. No customer original belongs here.
 
-`pnpm test tests/validation.test.ts` validates every generated file locally
-without calling AI. The order-flow tests also use a synthetic invoice to verify
-post-payment failure and manual-refund bookkeeping.
+The validation tests run without calling any model and cover the mechanical
+limits: file count, total size, page count, MIME mismatch, and image dimensions.
+The order-flow tests use synthetic documents to verify that no analysis runs
+before payment and that a paid order ends in a persisted report.
 
 There is no paid eval runner. Review a few model-generated reports manually
-before selling. Add synthetic equivalents of useful failure cases to tests;
+before selling. Add synthetic equivalents of useful failure cases to the Go tests;
 never copy customer originals here.
