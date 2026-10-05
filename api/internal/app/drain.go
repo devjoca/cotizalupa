@@ -10,7 +10,7 @@ import (
 
 func (a *App) Drain(ctx context.Context) error {
 	if _, err := a.DB.Exec(ctx, `UPDATE orders SET status='EXPIRED',delete_after=now(),user_context=NULL,email=NULL,updated_at=now()
-		WHERE status IN ('CREATED','READY_FOR_PAYMENT','PAYMENT_FAILED') AND created_at < now()-interval '30 days'`); err != nil {
+		WHERE status IN ('CREATED','READY_FOR_PAYMENT') AND created_at < now()-interval '30 days'`); err != nil {
 		return err
 	}
 	if _, err := a.DB.Exec(ctx, `UPDATE orders SET status='PROCESSING_FAILED',last_error='attempt_limit_exhausted',user_context=NULL,email=NULL,updated_at=now()
@@ -40,7 +40,7 @@ func (a *App) Drain(ctx context.Context) error {
 	}
 	// Keep a failed delivery address only for its operational recovery period.
 	if _, err := a.DB.Exec(ctx, `UPDATE orders SET email=NULL WHERE email IS NOT NULL AND
- (status IN ('REJECTED','EXPIRED','PROCESSING_FAILED','REFUNDED','NOT_ANALYZABLE') OR
+ (status IN ('REJECTED','EXPIRED','PROCESSING_FAILED','REFUNDED') OR
  (status='COMPLETED' AND completed_at < now()-interval '30 days'))`); err != nil {
 		return err
 	}
@@ -68,7 +68,7 @@ func (a *App) Drain(ctx context.Context) error {
 func (a *App) sweepDueOriginals(ctx context.Context, remove func(path string) error) (deleted, failed []string, err error) {
 	rows, err := a.DB.Query(ctx, `SELECT f.id,f.blob_path FROM order_files f JOIN orders o ON o.id=f.order_id
 		WHERE f.deleted_at IS NULL AND o.delete_after <= now()
-		AND o.status IN ('REJECTED','EXPIRED','COMPLETED','PROCESSING_FAILED','NOT_ANALYZABLE','REFUNDED')`)
+		AND o.status IN ('REJECTED','EXPIRED','COMPLETED','PROCESSING_FAILED','REFUNDED')`)
 	if err != nil {
 		return nil, nil, err
 	}

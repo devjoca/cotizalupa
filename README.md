@@ -5,9 +5,7 @@ analysis, and a private report link. Cloudflare Pages serves the prerendered
 frontend at `cotizalupa.com`; the Go service on Railway (`api.cotizalupa.com`)
 serves the API, Polar webhook, and report worker. Submission validates the file's
 technical limits, stores originals and opens the private order link. Polar
-checkout starts from that link. Sandbox payment and deployment checks remain.
-This is a first deployment: there is no production database or existing order
-data to migrate.
+checkout starts from that link.
 
 `web/` is the Cloudflare frontend; `api/` is the Railway Go service.
 Each owns its source, build configuration, and `.env.example`. Root commands
@@ -49,8 +47,7 @@ The Go binary embeds the SQL and also accepts `migrate` in deployment. Migration
 run explicitly, never during server startup. Only `DATABASE_URL` is needed, with
 the same local default as the server. Root API commands load `api/.env`,
 including `pnpm db:migrate`; direct Go commands and the deployed binary do not.
-The old root `.env` is not used. Transfer any needed settings into the app-local
-files yourself; keep API secrets out of `web/.env`.
+Keep API secrets out of `web/.env`.
 
 DB-backed tests are opt-in. They reset the dedicated `cotizalupa_test` database
 to the shipped migration and never touch the development database:
@@ -70,8 +67,7 @@ pnpm dev:infra:down
 
 Create an empty production Postgres database. Run `./cotizalupa migrate` as
 the Railway pre-deploy command before the API starts. Goose creates the schema
-and applies all shipped migrations; no Drizzle baseline or data-adoption step
-is needed.
+and applies all shipped migrations.
 
 Set the Railway service root directory to `/api`. Its `Dockerfile` builds
 the Go API image only, using `api/` as the build context. Locally, the equivalent
@@ -107,8 +103,7 @@ run a live charge as a verification step.
 To pause submissions on a deployed service, set `REVIEWS_DISABLED=true` in
 Railway's deployment environment and restart the service. Only the exact value
 `true` pauses the final submit and order-preparation endpoint. Unset or `false`
-allows mechanical validation, storage and Polar checkout, but does not enable free full analysis. The internal
-`/analyze` page and its separate analysis endpoint have been removed.
+allows mechanical validation, storage and Polar checkout, but does not enable free full analysis.
 
 No model runs before payment. The form preview is local; it does not certify
 legibility or content. Every paid order gets a best-effort report; manual refunds cover system failures only.

@@ -42,16 +42,13 @@ func (a *App) getReport(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, map[string]any{"status": "READY_FOR_PAYMENT", "amountCents": reviewPriceCents, "currency": "USD"})
 		return
-	case "REJECTED", "PAYMENT_PENDING", "PAYMENT_FAILED", "EXPIRED", "REFUNDED":
+	case "REJECTED", "PAYMENT_PENDING", "EXPIRED", "REFUNDED":
 		writeJSON(w, map[string]string{"status": status})
 		return
 	case "PAID", "PROCESSING":
 		writeJSON(w, map[string]string{"status": "PROCESSING"})
 		return
 	case "PROCESSING_FAILED":
-		writeJSON(w, map[string]string{"status": "FAILED"})
-		return
-	case "NOT_ANALYZABLE": // Legacy orders only.
 		writeJSON(w, map[string]string{"status": "FAILED"})
 		return
 	case "COMPLETED":
