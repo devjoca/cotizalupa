@@ -17,4 +17,3 @@ export function extensionToMime(name: string): AllowedMime | null {
   if (/\.png$/i.test(name)) return "image/png";
   return null;
 }
-
