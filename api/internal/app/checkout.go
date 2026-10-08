@@ -29,7 +29,7 @@ type polarCheckout struct {
 	IsFreeProductPrice bool   `json:"is_free_product_price"`
 	IsPaymentRequired  bool   `json:"is_payment_required"`
 	ProductPrice       *struct {
-		TaxBehavior string `json:"tax_behavior"`
+		TaxBehavior *string `json:"tax_behavior"`
 	} `json:"product_price"`
 }
 
@@ -195,7 +195,9 @@ func (a *App) checkout(w http.ResponseWriter, r *http.Request) {
 		"success_url": returnURL, "return_url": returnURL, "allow_discount_codes": false,
 		"allow_trial": false, "currency": "usd", "locale": "es",
 	})
-	if err != nil || checkout.ID == "" || checkout.URL == "" || checkout.ProductID != a.PolarProductID || checkout.Amount != reviewPriceCents || checkout.TotalAmount != reviewPriceCents || checkout.Currency != "usd" || checkout.IsFreeProductPrice || !checkout.IsPaymentRequired || checkout.ProductPrice == nil || checkout.ProductPrice.TaxBehavior != "inclusive" {
+	// A null price override inherits the organization's required Inclusive default.
+	// An explicit override must also be inclusive; signed payment totals are checked separately.
+	if err != nil || checkout.ID == "" || checkout.URL == "" || checkout.ProductID != a.PolarProductID || checkout.Amount != reviewPriceCents || checkout.TotalAmount != reviewPriceCents || checkout.Currency != "usd" || checkout.IsFreeProductPrice || !checkout.IsPaymentRequired || checkout.ProductPrice == nil || (checkout.ProductPrice.TaxBehavior != nil && *checkout.ProductPrice.TaxBehavior != "inclusive") {
 		a.releaseCheckoutFreeze(orderID)
 		CaptureOperationalError("polar_checkout_failed", map[string]string{"order_id": orderID})
 		writeJSON(w, map[string]string{"status": "PENDING"})

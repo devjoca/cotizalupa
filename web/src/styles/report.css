@@ -102,11 +102,42 @@ a:focus-visible {
   color: var(--report-muted);
 }
 
-.report-state__link {
-  display: inline-block;
-  margin-top: 32px;
-  color: var(--report-accent);
+.report-state > button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  margin-top: 28px;
+  padding: 12px 22px;
+  border: 1px solid var(--report-accent);
+  border-radius: 4px;
+  color: var(--report-paper);
+  background: var(--report-accent);
+  font-size: 15px;
   font-weight: 600;
+  cursor: pointer;
+}
+
+.report-state > button:hover:not(:disabled) {
+  background: #96291f;
+  border-color: #96291f;
+}
+
+.report-state > button:disabled {
+  opacity: .6;
+  cursor: wait;
+}
+
+.report-state__link {
+  display: block;
+  width: fit-content;
+  margin-top: 20px;
+  padding: 8px 0;
+  color: var(--report-accent);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 
 @media (max-width: 640px) {
@@ -121,6 +152,10 @@ a:focus-visible {
 
   .report-state {
     padding: 22px;
+  }
+
+  .report-state > button {
+    width: 100%;
   }
 
   .report-state__eyebrow {

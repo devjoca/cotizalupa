@@ -16,7 +16,7 @@ import { Icon } from "../components/landing/Icon";
 const SITE = "https://cotizalupa.com";
 const TITLE = "Revisa tu cotización antes de pagar | CotizaLupa";
 const DESCRIPTION =
-  "Sube tu cotización en PDF o foto y recibe un reporte con lo que está claro, lo que falta aclarar y las preguntas para tu proveedor. $12 USD, pago único.";
+  "Sube tu cotización en PDF o foto y recibe un reporte con lo que está claro, lo que falta aclarar y las preguntas para tu proveedor. $9.99 USD, pago único.";
 // Placeholder until the 1200x630 share image is added at public/og.png.
 const OG_IMAGE = `${SITE}/og.png`;
 
@@ -91,7 +91,7 @@ function Landing() {
         <div className="availability-note" role="status">
           {reviewsDisabled
             ? "Las revisiones aún no están disponibles. Explora el formulario o mira el reporte de ejemplo. No se enviarán archivos ni se realizarán cobros."
-            : "Revisa tus archivos antes de crear una orden. El pago único de $12 USD se abre desde el enlace privado; la IA analiza después de la confirmación."}
+            : "Revisa tus archivos antes de crear una orden. El pago único de $9.99 USD se abre desde el enlace privado; la IA analiza después de la confirmación."}
         </div>
         <Hero onStart={startFlow} />
         <div className="category-strip">

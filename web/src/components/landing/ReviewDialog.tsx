@@ -246,7 +246,7 @@ export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogPro
       </div>
       <div className="flow-top">
         <span id="step-label">PASO {state.step} DE 3</span>
-        <span>Precio de lanzamiento · $12 USD</span>
+        <span>Precio de lanzamiento · $9.99 USD</span>
       </div>
       <div className="flow-progress">
         <i style={{ width: `${(state.step / 3) * 100}%` }} />
@@ -432,7 +432,7 @@ export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogPro
               </div>
               <div className="summary-row summary-total">
                 <span>Precio de la revisión</span>
-                <b>$12 USD</b>
+                <b>$9.99 USD</b>
               </div>
               <div className="demo-banner">
                 <strong>Crear la orden no realiza ningún cobro.</strong>

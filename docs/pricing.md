@@ -1,20 +1,20 @@
 # Pricing
 
-The launch ticket is $12 USD for one review of one quotation. It is a one-time
+The launch ticket is $9.99 USD for one review of one quotation. It is a one-time
 purchase. This file owns the ticket and the payment rail; change it and
 `AGENTS.md` together.
 
 ## Experiment
 
-We are testing whether a person will pay $12 for a useful report before
-accepting a quotation. The landing shows $12 USD.
+We are testing whether a person will pay $9.99 for a useful report before
+accepting a quotation. The landing shows $9.99 USD.
 
 ## Polar checkout
 
 Joca confirmed Polar approved CotizaLupa. Polar is the Merchant of Record and
-the only MVP payment rail. The product must be a one-time, fixed-price USD 12
+the only MVP payment rail. The product must be a one-time, fixed-price USD 9.99
 product with tax-inclusive pricing, with discount codes and trials disabled.
-The buyer's total must stay at $12 after tax. Configure its product ID,
+The buyer's total must stay at $9.99 after tax. Configure its product ID,
 organization access token, signed webhook secret, sandbox or production mode,
 and public app URL on the server. No provider credentials go to the browser or
 repository.
@@ -42,13 +42,13 @@ confirmed expired or failed session closes the order as EXPIRED. The
 browser return only reads state. The signed
 [`order.paid` event](https://polar.sh/docs/api-reference/webhooks/order.paid)
 changes an order to PAID only after checking the registered checkout ID, product,
-order ID, paid status, $12 subtotal and total, no discount, and USD currency. Insert the
+order ID, paid status, $9.99 subtotal and total, no discount, and USD currency. Insert the
 unique event and change state in one DB transaction. Store only event metadata;
 `payment_events.payload` receives `{}`.
 
 Polar's [public fees](https://polar.sh/docs/merchant-of-record/fees) list Starter
-at 5% + $0.50 per transaction, plus 1.5% for non-US cards. At $12, those two
-fees would be $1.28 before payout costs, taxes, or other fees. Confirm the
+at 5% + $0.50 per transaction, plus 1.5% for non-US cards. At $9.99, those two
+fees would be $1.15 before payout costs, taxes, or other fees. Confirm the
 actual account plan before using this estimate for decisions. Polar says the
 initial transaction fee is not returned to the seller after a refund.
 

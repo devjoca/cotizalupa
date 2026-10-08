@@ -30,7 +30,7 @@ function TermsPage() {
           parte del servicio inicial.
         </p>
         <p>
-          Una revisión cuesta 12 USD, pago único mediante Polar. Puedes revisar
+          Una revisión cuesta 9.99 USD, pago único mediante Polar. Puedes revisar
           una vista previa y crear una orden antes de pagar. Solo validamos los
           requisitos técnicos del archivo antes del pago, no su contenido.
           Crear una orden no genera un reporte ni confirma una compra.

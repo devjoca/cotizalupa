@@ -19,7 +19,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const reviewPriceCents = 1200
+const reviewPriceCents = 999
 
 type paidOrderEvent struct {
 	Type string `json:"type"`

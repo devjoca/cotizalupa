@@ -7,7 +7,7 @@ export function Closing({ onStart }: { onStart: () => void }) {
       <button className="button lime" onClick={onStart}>
         Revisar mi cotización <Icon name="arrow-up-right" />
       </button>
-      <p>Precio de lanzamiento: $12 USD · pago único</p>
+      <p>Precio de lanzamiento: $9.99 USD · pago único</p>
     </section>
   );
 }

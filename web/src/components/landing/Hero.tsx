@@ -148,7 +148,7 @@ export function Hero({ onStart }: { onStart: () => void }) {
             Revisar mi cotización <Icon name="arrow-up-right" />
           </button>
           <div className="price-inline">
-            <strong>$12 USD</strong>
+            <strong>$9.99 USD</strong>
             <span>precio de lanzamiento · pago único</span>
           </div>
         </div>

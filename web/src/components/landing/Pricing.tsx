@@ -13,7 +13,7 @@ export function Pricing({ onStart }: { onStart: () => void }) {
       <div className="price-card">
         <span className="label">PRECIO DE LANZAMIENTO · UNA COTIZACIÓN</span>
         <div className="large-price">
-          $12 USD<span>pago único</span>
+          $9.99 USD<span>pago único</span>
         </div>
         <ul>
           <li>Lo claro y lo que falta aclarar</li>

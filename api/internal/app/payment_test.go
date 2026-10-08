@@ -25,8 +25,8 @@ func TestPolarSignatureAndTicket(t *testing.T) {
 		"type": "order.paid",
 		"data": map[string]any{
 			"id": "polar_order_1", "paid": true, "status": "paid", "billing_reason": "purchase",
-			"product_id": "product_1", "currency": "usd", "subtotal_amount": 1200,
-			"discount_amount": 0, "total_amount": 1200, "checkout_id": "checkout_1",
+			"product_id": "product_1", "currency": "usd", "subtotal_amount": 999,
+			"discount_amount": 0, "total_amount": 999, "checkout_id": "checkout_1",
 			"metadata": map[string]string{"order_id": "123e4567-e89b-42d3-a456-426614174000"},
 		},
 	})
@@ -74,8 +74,8 @@ func TestWebhookHandlerInLocalPostgres(t *testing.T) {
 	secret := "whsec_" + base64.StdEncoding.EncodeToString([]byte("synthetic-test-key"))
 	body, err := json.Marshal(map[string]any{"type": "order.paid", "data": map[string]any{
 		"id": "polar_order_1", "paid": true, "status": "paid", "billing_reason": "purchase",
-		"product_id": "product_1", "currency": "usd", "subtotal_amount": 1200, "discount_amount": 0,
-		"total_amount": 1200, "checkout_id": checkoutID, "metadata": map[string]string{"order_id": orderID},
+		"product_id": "product_1", "currency": "usd", "subtotal_amount": 999, "discount_amount": 0,
+		"total_amount": 999, "checkout_id": checkoutID, "metadata": map[string]string{"order_id": orderID},
 	}})
 	if err != nil {
 		t.Fatal(err)

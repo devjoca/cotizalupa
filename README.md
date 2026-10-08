@@ -94,8 +94,10 @@ Polar checkout needs server-only `POLAR_ACCESS_TOKEN`, `POLAR_PRODUCT_ID`,
 `PUBLIC_APP_URL` (the Pages origin, `https://cotizalupa.com`). The API allows
 exactly that origin for CORS; checkout `success_url`/`return_url` and report
 emails point at it too. Subscribe the webhook endpoint
-`/api/webhooks/polar` to `order.paid`. Configure a one-time $12 USD product with
-tax-inclusive pricing so the buyer's total remains $12, and keep
+`/api/webhooks/polar` to `order.paid`. Configure a one-time $9.99 USD product with
+tax-inclusive pricing so the buyer's total remains $9.99: set Settings → Payments →
+Default tax behavior to Inclusive. A product price may inherit this default
+or explicitly use Inclusive; keep
 discounts and trials disabled. The access token needs checkout create/read
 scopes. Use sandbox values for local testing; never
 run a live charge as a verification step.

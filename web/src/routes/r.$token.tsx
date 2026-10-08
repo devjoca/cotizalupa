@@ -101,7 +101,7 @@ function ReportPage() {
     result.status === "READY_FOR_PAYMENT"
       ? {
           eyebrow: "PAGO PENDIENTE",
-          title: "Tu revisión está lista para pagar.",
+          title: "Tu orden está lista para ser pagada.",
           detail: `La revisión cuesta $${result.amountCents / 100} ${result.currency}. Después del pago, tu reporte aparecerá aquí y te lo enviaremos por correo.`,
         }
       : result.status === "PAYMENT_PENDING"
