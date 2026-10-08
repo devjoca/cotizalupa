@@ -55,7 +55,7 @@ export type PrepareResult =
 export function prepareReview(input: {
   files: File[];
   perspective: "customer";
-  context: { email: string; concern: string };
+  context: { email: string; concern: string; ad_fbc?: string };
 }): Promise<PrepareResult> {
   const body = new FormData();
   body.set("context", JSON.stringify({ perspective: input.perspective, ...input.context }));

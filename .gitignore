@@ -6,4 +6,3 @@ web/dist
 .env
 .env.*
 !.env.example
-.tanstack

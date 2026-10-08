@@ -70,8 +70,10 @@ for this experiment without a separate decision.
   merely because time passed.
 - Manual refunds (system failures only) happen in Polar first, then the conditional DB transition to
   REFUNDED. No automatic refund path.
-- Meta CAPI Purchase follows as a separate integration after payment, once
-  approved. It uses verified paid orders only and no quotation content.
+- Meta CAPI sends Purchase after a verified paid order if it carries a Meta ad
+  click ID. There is no browser pixel. The event has the fixed ticket, a stable
+  order event ID, and the public landing URL, never quotation content or a
+  private report link.
 - The report stays as JSON and facts in Postgres. `/r/{token}` renders it and
   offers browser print-to-PDF. Resend emails the private link after the report
   is saved. No server PDF renderer or generated attachment.

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 
 import { getReviewsAvailability } from "../lib/api";
+import { rememberMetaClick } from "../lib/adAttribution";
 
 import { Hero } from "../components/landing/Hero";
 import { RoleCards } from "../components/landing/RoleCards";
@@ -17,7 +18,6 @@ const SITE = "https://cotizalupa.com";
 const TITLE = "Revisa tu cotización antes de pagar | CotizaLupa";
 const DESCRIPTION =
   "Sube tu cotización en PDF o foto y recibe un reporte con lo que está claro, lo que falta aclarar y las preguntas para tu proveedor. $9.99 USD, pago único.";
-// Placeholder until the 1200x630 share image is added at public/og.png.
 const OG_IMAGE = `${SITE}/og.png`;
 
 export const Route = createFileRoute("/")({
@@ -56,6 +56,7 @@ function Landing() {
   // new orders while reviews are disabled.
   const [reviewsDisabled, setReviewsDisabled] = useState(false);
   useEffect(() => {
+    rememberMetaClick();
     getReviewsAvailability()
       .then((result) => setReviewsDisabled(result.reviewsDisabled))
       .catch(() => {});

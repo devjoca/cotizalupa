@@ -4,12 +4,13 @@ import { useNavigate } from "@tanstack/react-router";
 import { Icon } from "./Icon";
 import { extensionToMime } from "#/lib/uploadLimits";
 import { beginCheckout, prepareReview } from "#/lib/api";
+import { currentMetaFBC } from "#/lib/adAttribution";
 import {
   MAX_CONCERN_LENGTH,
   cleanConcern,
   flowReducer,
   initialFlowState,
-  missingStepTwoField,
+  missingFirstStepField,
   validatePickedFiles,
   type FlowFields,
 } from "./review-flow";
@@ -142,8 +143,8 @@ export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogPro
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (state.step === 2) {
-      const missing = missingStepTwoField(state, disabled || files.length > 0);
+    if (state.step === 1) {
+      const missing = missingFirstStepField(state, disabled || files.length > 0);
       if (missing === "file") {
         fileInputRef.current?.focus();
       } else if (missing) {
@@ -167,6 +168,7 @@ export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogPro
     const contextSnapshot = {
       email: state.email.trim(),
       concern: cleanConcern(state.concern),
+      ad_fbc: currentMetaFBC(),
     };
     setPreparing(true);
     setPreparationError(null);
@@ -245,11 +247,11 @@ export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogPro
         </button>
       </div>
       <div className="flow-top">
-        <span id="step-label">PASO {state.step} DE 3</span>
+        <span id="step-label">PASO {state.step} DE 2</span>
         <span>Precio de lanzamiento · $9.99 USD</span>
       </div>
       <div className="flow-progress">
-        <i style={{ width: `${(state.step / 3) * 100}%` }} />
+        <i style={{ width: `${(state.step / 2) * 100}%` }} />
       </div>
       <form id="review-form" noValidate onSubmit={submit}>
         <div id="flow-content">
@@ -262,31 +264,11 @@ export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogPro
           {state.step === 1 && (
             <>
               <h2 id="flow-title" tabIndex={-1}>
-                Revisa tu cotización como cliente
-              </h2>
-              <p>
-                Una revisión enfocada en tu próxima decisión: aceptar o pagar.
-              </p>
-              <input type="hidden" name="role" value="cliente" />
-              <p className="soon-note">
-                ¿Eres proveedor? Esa perspectiva llega pronto.
-              </p>
-              <p className="privacy-note">
-                Puedes crear la orden sin una cuenta. El pago se abre después
-                de verificar los archivos.
-              </p>
-            </>
-          )}
-          {state.step === 2 && (
-            <>
-              <h2 id="flow-title" tabIndex={-1}>
-                Cuéntanos lo justo.
+                Sube tu cotización
               </h2>
               <p className="privacy-note">
-                Sube una sola propuesta comercial de un proveedor. Incluye todas
-                sus páginas y anexos relevantes; puedes enviar varias fotos si
-                pertenecen a esa misma cotización. Verifica que cifras y texto
-                se lean antes de continuar.
+                Elige el PDF o las fotos de una sola propuesta de un proveedor.
+                Incluye todas sus páginas y comprueba que textos y montos se lean.
               </p>
               <label
                 className="upload"
@@ -368,7 +350,7 @@ export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogPro
               </label>
             </>
           )}
-          {state.step === 3 && (
+          {state.step === 2 && (
             <>
               <h2 id="flow-title" tabIndex={-1}>
                 Revisa antes de pagar
@@ -475,7 +457,7 @@ export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogPro
           >
             Atrás
           </button>
-          {state.step === 3 ? (
+          {state.step === 2 ? (
             <button
               type="button"
               className="button blue"
@@ -491,7 +473,7 @@ export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogPro
             </button>
           ) : (
             <button type="submit" className="button blue" id="next">
-              Continuar <Icon name="arrow-right" />
+              Revisar archivos <Icon name="arrow-right" />
             </button>
           )}
         </div>

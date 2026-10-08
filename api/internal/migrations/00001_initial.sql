@@ -19,9 +19,17 @@ CREATE TABLE "orders" (
 	"perspective" text,
 	"user_context" text,
 	"email" text,
+	"report_email_first_attempt_at" timestamp with time zone,
+	"report_email_last_attempt_at" timestamp with time zone,
+	"report_email_sent_at" timestamp with time zone,
+	"report_email_id" text,
+	"report_email_last_error" text,
 	"report_token_hash" text NOT NULL,
 	"payment_provider" text,
 	"payment_transaction_id" text,
+	"meta_fbc" text,
+	"meta_purchase_last_attempt_at" timestamp with time zone,
+	"meta_purchase_sent_at" timestamp with time zone,
 	"processing_started_at" timestamp with time zone,
 	"delete_after" timestamp with time zone DEFAULT now() + interval '30 days' NOT NULL,
 	"attempts" smallint DEFAULT 0 NOT NULL,
@@ -74,3 +82,6 @@ CREATE UNIQUE INDEX "order_files_order_position_idx" ON "order_files" USING btre
 CREATE INDEX "orders_status_idx" ON "orders" USING btree ("status");
 
 CREATE INDEX "orders_delete_after_idx" ON "orders" USING btree ("delete_after");
+
+CREATE INDEX "orders_meta_purchase_due_idx" ON "orders" USING btree ("paid_at")
+	WHERE "meta_fbc" IS NOT NULL AND "meta_purchase_sent_at" IS NULL;

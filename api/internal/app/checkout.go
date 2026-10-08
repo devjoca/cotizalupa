@@ -33,9 +33,21 @@ type polarCheckout struct {
 	} `json:"product_price"`
 }
 
+type polarCheckoutRequest struct {
+	Products           []string          `json:"products"`
+	Metadata           map[string]string `json:"metadata"`
+	SuccessURL         string            `json:"success_url"`
+	ReturnURL          string            `json:"return_url"`
+	AllowDiscountCodes bool              `json:"allow_discount_codes"`
+	AllowTrial         bool              `json:"allow_trial"`
+	Currency           string            `json:"currency"`
+	Locale             string            `json:"locale"`
+}
+
 var errInvalidOriginal = errors.New("stored original is invalid")
 
-func (a *App) polarRequest(ctx context.Context, method, path string, data any) (polarCheckout, error) {
+// polarRequest sends data as the JSON body when it is non-nil.
+func (a *App) polarRequest(ctx context.Context, method, path string, data *polarCheckoutRequest) (polarCheckout, error) {
 	var checkout polarCheckout
 	var body io.Reader
 	if data != nil {
@@ -70,27 +82,17 @@ func (a *App) polarRequest(ctx context.Context, method, path string, data any) (
 }
 
 func (a *App) storedFilesMatch(ctx context.Context, orderID string) error {
-	rows, err := a.DB.Query(ctx, `SELECT blob_path,mime,size_bytes,sha256 FROM order_files WHERE order_id=$1 AND deleted_at IS NULL ORDER BY position`, orderID)
+	files, err := a.loadOrderFiles(ctx, orderID)
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
-	count := 0
-	for rows.Next() {
-		var path, mime, expectedHash string
-		var expectedSize int64
-		if err := rows.Scan(&path, &mime, &expectedSize, &expectedHash); err != nil {
-			return err
-		}
-		if mime != "application/pdf" && mime != "image/png" && mime != "image/jpeg" {
-			return errInvalidOriginal
-		}
-		object, err := a.Bucket.GetObject(ctx, a.BucketName, path, minio.GetObjectOptions{})
+	for _, file := range files {
+		object, err := a.Bucket.GetObject(ctx, a.BucketName, file.Path, minio.GetObjectOptions{})
 		if err != nil {
 			return err
 		}
 		digest := sha256.New()
-		n, err := io.Copy(digest, io.LimitReader(object, expectedSize+1))
+		n, err := io.Copy(digest, io.LimitReader(object, file.Size+1))
 		closeErr := object.Close()
 		if err != nil {
 			return err
@@ -98,118 +100,142 @@ func (a *App) storedFilesMatch(ctx context.Context, orderID string) error {
 		if closeErr != nil {
 			return closeErr
 		}
-		if n != expectedSize || hex.EncodeToString(digest.Sum(nil)) != expectedHash {
+		if n != file.Size || hex.EncodeToString(digest.Sum(nil)) != file.SHA256 {
 			return errInvalidOriginal
 		}
-		count++
-	}
-	if err := rows.Err(); err != nil {
-		return err
-	}
-	if count == 0 || count > 5 {
-		return errInvalidOriginal
 	}
 	return nil
+}
+
+type checkoutResponse struct {
+	Status string `json:"status"`
+	URL    string `json:"url,omitempty"`
+}
+
+// checkoutState is a checkout answer without a payable URL; only
+// checkoutRedirect carries one.
+type checkoutState string
+
+const (
+	checkoutNotFound     checkoutState = "NOT_FOUND"
+	checkoutUnavailable  checkoutState = "UNAVAILABLE"
+	checkoutPending      checkoutState = "PENDING"
+	checkoutExpired      checkoutState = "EXPIRED"
+	checkoutInvalidFiles checkoutState = "INVALID_FILES"
+)
+
+func (s checkoutState) response() checkoutResponse { return checkoutResponse{Status: string(s)} }
+
+func checkoutRedirect(url string) checkoutResponse {
+	return checkoutResponse{Status: "CHECKOUT", URL: url}
 }
 
 func (a *App) checkout(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		Token string `json:"token"`
 	}
-	if json.NewDecoder(io.LimitReader(r.Body, 1024)).Decode(&input) != nil || !reportTokenPattern.MatchString(input.Token) {
-		writeJSON(w, map[string]string{"status": "NOT_FOUND"})
+	if json.NewDecoder(io.LimitReader(r.Body, 1024)).Decode(&input) != nil {
+		writeJSON(w, checkoutNotFound.response())
 		return
 	}
-	digest := sha256.Sum256([]byte(input.Token))
-	var orderID, status string
+	token, ok := parseReportToken(input.Token)
+	if !ok {
+		writeJSON(w, checkoutNotFound.response())
+		return
+	}
+	var orderID, rawStatus string
 	var provider, checkoutID, email *string
 	var deleteAfter time.Time
-	err := a.DB.QueryRow(r.Context(), `SELECT id,status,payment_provider,payment_transaction_id,delete_after,email FROM orders WHERE report_token_hash=$1`, hex.EncodeToString(digest[:])).Scan(&orderID, &status, &provider, &checkoutID, &deleteAfter, &email)
+	err := a.DB.QueryRow(r.Context(), `SELECT id,status,payment_provider,payment_transaction_id,delete_after,email FROM orders WHERE report_token_hash=$1`, token.hash()).Scan(&orderID, &rawStatus, &provider, &checkoutID, &deleteAfter, &email)
 	if errors.Is(err, pgx.ErrNoRows) {
-		writeJSON(w, map[string]string{"status": "NOT_FOUND"})
+		writeJSON(w, checkoutNotFound.response())
 		return
 	}
 	if err != nil {
-		writeJSON(w, map[string]string{"status": "UNAVAILABLE"})
+		writeJSON(w, checkoutUnavailable.response())
 		return
 	}
-	if status == "PAYMENT_PENDING" {
+	status, err := parseOrderStatus(rawStatus)
+	if err != nil {
+		writeJSON(w, checkoutUnavailable.response())
+		return
+	}
+	if status == statusPaymentPending {
 		if provider == nil || *provider != "polar" || checkoutID == nil {
-			writeJSON(w, map[string]string{"status": "PENDING"})
+			writeJSON(w, checkoutPending.response())
 			return
 		}
 		checkout, err := a.polarRequest(r.Context(), http.MethodGet, "/v1/checkouts/"+url.PathEscape(*checkoutID), nil)
 		if err != nil || checkout.ID != *checkoutID {
-			writeJSON(w, map[string]string{"status": "PENDING"})
+			writeJSON(w, checkoutPending.response())
 			return
 		}
 		if checkout.Status == "open" {
 			if email == nil || !validEmail(*email) {
-				writeJSON(w, map[string]string{"status": "UNAVAILABLE"})
+				writeJSON(w, checkoutUnavailable.response())
 				return
 			}
-			writeJSON(w, map[string]string{"status": "CHECKOUT", "url": checkout.URL})
+			writeJSON(w, checkoutRedirect(checkout.URL))
 			return
 		}
 		if checkout.Status != "expired" && checkout.Status != "failed" {
-			writeJSON(w, map[string]string{"status": "PENDING"})
+			writeJSON(w, checkoutPending.response())
 			return
 		}
 		result, err := a.DB.Exec(r.Context(), `UPDATE orders SET status='EXPIRED',delete_after=now(),user_context=NULL,email=NULL,updated_at=now() WHERE id=$1 AND status='PAYMENT_PENDING' AND payment_provider='polar' AND payment_transaction_id=$2`, orderID, *checkoutID)
 		if err != nil || result.RowsAffected() != 1 {
-			writeJSON(w, map[string]string{"status": "PENDING"})
+			writeJSON(w, checkoutPending.response())
 			return
 		}
-		writeJSON(w, map[string]string{"status": "EXPIRED"})
+		writeJSON(w, checkoutExpired.response())
 		return
 	}
 	if email == nil || !validEmail(*email) {
-		writeJSON(w, map[string]string{"status": "UNAVAILABLE"})
+		writeJSON(w, checkoutUnavailable.response())
 		return
 	}
-	if status != "READY_FOR_PAYMENT" {
-		writeJSON(w, map[string]string{"status": "UNAVAILABLE"})
+	if status != statusReadyForPayment {
+		writeJSON(w, checkoutUnavailable.response())
 		return
 	}
 	if !deleteAfter.After(time.Now()) {
-		writeJSON(w, map[string]string{"status": "UNAVAILABLE"})
+		writeJSON(w, checkoutUnavailable.response())
 		return
 	}
 	if err := a.storedFilesMatch(r.Context(), orderID); err != nil {
 		if errors.Is(err, errInvalidOriginal) {
 			_, _ = a.DB.Exec(context.Background(), `UPDATE orders SET status='REJECTED',delete_after=now(),user_context=NULL,email=NULL,updated_at=now() WHERE id=$1 AND status=$2`, orderID, status)
-			writeJSON(w, map[string]string{"status": "INVALID_FILES"})
+			writeJSON(w, checkoutInvalidFiles.response())
 			return
 		}
-		writeJSON(w, map[string]string{"status": "UNAVAILABLE"})
+		writeJSON(w, checkoutUnavailable.response())
 		return
 	}
 	result, err := a.DB.Exec(r.Context(), `UPDATE orders SET status='PAYMENT_PENDING',payment_provider='polar',payment_transaction_id=NULL,updated_at=now() WHERE id=$1 AND status='READY_FOR_PAYMENT' AND delete_after > now()`, orderID)
 	if err != nil || result.RowsAffected() != 1 {
-		writeJSON(w, map[string]string{"status": "PENDING"})
+		writeJSON(w, checkoutPending.response())
 		return
 	}
-	returnURL := a.PublicURL.ResolveReference(&url.URL{Path: "/r/" + input.Token}).String()
-	checkout, err := a.polarRequest(r.Context(), http.MethodPost, "/v1/checkouts", map[string]any{
-		"products": []string{a.PolarProductID}, "metadata": map[string]string{"order_id": orderID},
-		"success_url": returnURL, "return_url": returnURL, "allow_discount_codes": false,
-		"allow_trial": false, "currency": "usd", "locale": "es",
+	returnURL := a.PublicURL.ResolveReference(&url.URL{Path: "/r/" + string(token)}).String()
+	checkout, err := a.polarRequest(r.Context(), http.MethodPost, "/v1/checkouts", &polarCheckoutRequest{
+		Products: []string{a.PolarProductID}, Metadata: map[string]string{"order_id": orderID},
+		SuccessURL: returnURL, ReturnURL: returnURL, Currency: "usd", Locale: "es",
 	})
 	// A null price override inherits the organization's required Inclusive default.
 	// An explicit override must also be inclusive; signed payment totals are checked separately.
 	if err != nil || checkout.ID == "" || checkout.URL == "" || checkout.ProductID != a.PolarProductID || checkout.Amount != reviewPriceCents || checkout.TotalAmount != reviewPriceCents || checkout.Currency != "usd" || checkout.IsFreeProductPrice || !checkout.IsPaymentRequired || checkout.ProductPrice == nil || (checkout.ProductPrice.TaxBehavior != nil && *checkout.ProductPrice.TaxBehavior != "inclusive") {
 		a.releaseCheckoutFreeze(orderID)
 		CaptureOperationalError("polar_checkout_failed", map[string]string{"order_id": orderID})
-		writeJSON(w, map[string]string{"status": "PENDING"})
+		writeJSON(w, checkoutPending.response())
 		return
 	}
 	result, err = a.DB.Exec(r.Context(), `UPDATE orders SET payment_transaction_id=$2,updated_at=now() WHERE id=$1 AND status='PAYMENT_PENDING' AND payment_provider='polar' AND payment_transaction_id IS NULL`, orderID, checkout.ID)
 	if err != nil || result.RowsAffected() != 1 {
 		a.releaseCheckoutFreeze(orderID)
-		writeJSON(w, map[string]string{"status": "PENDING"})
+		writeJSON(w, checkoutPending.response())
 		return
 	}
-	writeJSON(w, map[string]string{"status": "CHECKOUT", "url": checkout.URL})
+	writeJSON(w, checkoutRedirect(checkout.URL))
 }
 
 // releaseCheckoutFreeze returns a frozen order to READY_FOR_PAYMENT when no

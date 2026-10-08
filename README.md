@@ -102,6 +102,16 @@ discounts and trials disabled. The access token needs checkout create/read
 scopes. Use sandbox values for local testing; never
 run a live charge as a verification step.
 
+For Meta ads, set server-only `META_PIXEL_ID` and `META_ACCESS_TOKEN` together.
+There is no browser Pixel. The public landing retains a Meta click ID for seven
+days in first-party local storage and includes it with an order. The API sends a
+CAPI `Purchase` only for a verified paid order carrying that ID. Delivery runs
+outside the Polar webhook and retries with the order ID as a stable event ID.
+It sends the public landing URL, USD 9.99, the click ID, and payment time, never
+the quotation, email, or private report link. Check received events in Meta's
+test tools before buying traffic. If Meta is unavailable, payment and analysis
+continue; `pnpm ops:drain` also retries eligible deliveries.
+
 To pause submissions on a deployed service, set `REVIEWS_DISABLED=true` in
 Railway's deployment environment and restart the service. Only the exact value
 `true` pauses the final submit and order-preparation endpoint. Unset or `false`

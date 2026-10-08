@@ -40,6 +40,9 @@ function PrivacyPage() {
           También recibimos metadatos técnicos necesarios para validar y
           procesar el archivo, como su nombre, tipo, tamaño y una huella digital
           que permite comprobar su integridad.
+          Si llegas desde un anuncio de Meta, guardamos el identificador del clic
+          en tu navegador. Lo usamos durante un máximo de siete días y lo
+          asociamos a la orden que crees en ese plazo.
         </p>
         <p>
           No subas datos que no sean necesarios para revisar la
@@ -128,6 +131,15 @@ function PrivacyPage() {
           el reporte está listo. No le enviamos los archivos ni el contenido del
           reporte. Resend puede conservar información del envío conforme a su{" "}
           <a href="https://resend.com/legal/privacy-policy" target="_blank" rel="noreferrer">política de privacidad</a>.
+        </p>
+        <p>
+          Si una orden asociada a un clic de anuncio llega a pagarse, enviamos a
+          Meta un evento de compra desde nuestro servidor. Incluye el identificador
+          del clic, el precio de 9.99 USD, la hora del pago y un identificador de
+          evento para evitar duplicados. No enviamos la cotización, tu correo ni
+          el enlace privado del reporte. El sitio no carga el píxel de Meta.
+          Eliminamos el identificador de nuestra base después del envío o en la
+          siguiente limpieza de órdenes vencidas y eventos antiguos.
         </p>
         <p>
           CotizaLupa puede usar Sentry para recibir errores operativos

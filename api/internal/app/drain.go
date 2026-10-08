@@ -38,6 +38,17 @@ func (a *App) Drain(ctx context.Context) error {
 	if err := a.recoverReportEmails(ctx); err != nil {
 		return err
 	}
+	if a.Meta != nil {
+		if err := a.recoverMetaPurchases(ctx, *a.Meta); err != nil {
+			return err
+		}
+	}
+	// Meta does not accept arbitrarily old web events. Discard click IDs after
+	// the delivery window and from orders that closed without payment.
+	if _, err := a.DB.Exec(ctx, `UPDATE orders SET meta_fbc=NULL WHERE meta_fbc IS NOT NULL AND
+		(paid_at < now()-interval '6 days' OR status IN ('REJECTED','EXPIRED'))`); err != nil {
+		return err
+	}
 	// Keep a failed delivery address only for its operational recovery period.
 	if _, err := a.DB.Exec(ctx, `UPDATE orders SET email=NULL WHERE email IS NOT NULL AND
  (status IN ('REJECTED','EXPIRED','PROCESSING_FAILED','REFUNDED') OR

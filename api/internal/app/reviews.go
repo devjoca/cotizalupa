@@ -30,6 +30,7 @@ type reviewContext struct {
 	Perspective string `json:"perspective"`
 	Email       string `json:"email"`
 	Concern     string `json:"concern"`
+	AdFBC       string `json:"ad_fbc"`
 }
 
 type preparedFile struct {
@@ -55,6 +56,9 @@ func (c *reviewContext) normalize() error {
 		return errors.New("invalid email")
 	}
 	c.Concern = cleanText(c.Concern)
+	if !validMetaFBC(c.AdFBC) {
+		c.AdFBC = ""
+	}
 	if length := len([]rune(c.Concern)); c.Perspective != "customer" || length < minConcernRunes || length > maxConcernRunes {
 		return errors.New("invalid context")
 	}
@@ -211,8 +215,8 @@ func (a *App) prepareReview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(r.Context())
-	_, err = tx.Exec(r.Context(), `INSERT INTO orders(id,status,report_token_hash,perspective,user_context,email)
-		VALUES($1,'CREATED',$2,'customer',$3,$4)`, orderID, tokenHash, contextData.Concern, contextData.Email)
+	_, err = tx.Exec(r.Context(), `INSERT INTO orders(id,status,report_token_hash,perspective,user_context,email,meta_fbc)
+		VALUES($1,'CREATED',$2,'customer',$3,$4,NULLIF($5,''))`, orderID, tokenHash, contextData.Concern, contextData.Email, contextData.AdFBC)
 	if err != nil {
 		http.Error(w, "unavailable", http.StatusInternalServerError)
 		return

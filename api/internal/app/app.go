@@ -25,6 +25,7 @@ const defaultAnalysisModel = "gpt-6.1-sol"
 type App struct {
 	ReportTokenSecret  []byte
 	Mailer             resendMailer
+	Meta               *metaClient // nil when purchase tracking is off
 	DB                 *pgxpool.Pool
 	Bucket             *minio.Client
 	BucketName         string
@@ -88,6 +89,13 @@ func New(ctx context.Context) (*App, error) {
 	if app.PolarAccessToken == "" || app.PolarProductID == "" || app.PolarWebhookSecret == "" {
 		return nil, errors.New("Polar configuration is required")
 	}
+	pixelID, metaToken := os.Getenv("META_PIXEL_ID"), os.Getenv("META_ACCESS_TOKEN")
+	if (pixelID == "") != (metaToken == "") || (pixelID != "" && !validMetaPixelID(pixelID)) {
+		return nil, errors.New("META_PIXEL_ID and META_ACCESS_TOKEN must be configured together")
+	}
+	if pixelID != "" {
+		app.Meta = &metaClient{PixelID: pixelID, AccessToken: metaToken}
+	}
 	if app.OpenAIModel == "" {
 		app.OpenAIModel = defaultAnalysisModel
 	}
@@ -137,7 +145,9 @@ func (a *App) Close() { a.DB.Close() }
 func (a *App) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/availability", func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, map[string]bool{"reviewsDisabled": a.Disabled})
+		writeJSON(w, struct {
+			ReviewsDisabled bool `json:"reviewsDisabled"`
+		}{a.Disabled})
 	})
 	mux.HandleFunc("POST /api/reviews", a.prepareReview)
 	mux.HandleFunc("GET /api/reports/{token}", a.getReport)
@@ -149,6 +159,9 @@ func (a *App) Handler() http.Handler {
 
 func (a *App) Run(ctx context.Context) error {
 	go a.work(ctx)
+	if a.Meta != nil {
+		go a.workMetaPurchases(ctx, *a.Meta)
+	}
 	port := os.Getenv("PORT")
 	if _, err := strconv.Atoi(port); err != nil {
 		port = "3001"

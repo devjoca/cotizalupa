@@ -17,7 +17,7 @@ export const MIN_CONCERN_LENGTH = 10;
 export const MAX_CONCERN_LENGTH = 800;
 
 export interface FlowState extends FlowFields {
-  step: 1 | 2 | 3;
+  step: 1 | 2;
   fileName: string | null;
   error: string | null;
 }
@@ -44,17 +44,17 @@ export const MISSING_FILE_ERROR =
 export const INVALID_FILE_ERROR =
   "Elige hasta 5 archivos PDF, JPG o PNG, no vacíos y de hasta 25 MB en total.";
 
-export type MissingStepTwoField = "file" | "concern" | "email";
+export type MissingFirstStepField = "file" | "concern" | "email";
 
 // Same whitespace collapsing the API applies before counting characters.
 export function cleanConcern(value: string): string {
   return value.normalize("NFKC").trim().split(/\s+/).filter(Boolean).join(" ");
 }
 
-export function missingStepTwoField(
+export function missingFirstStepField(
   state: FlowFields,
   hasFile: boolean,
-): MissingStepTwoField | null {
+): MissingFirstStepField | null {
   if (!hasFile) return "file";
   const concernLength = [...cleanConcern(state.concern)].length;
   if (concernLength < MIN_CONCERN_LENGTH || concernLength > MAX_CONCERN_LENGTH) return "concern";
@@ -62,7 +62,7 @@ export function missingStepTwoField(
   return null;
 }
 
-function missingStepTwoError(field: MissingStepTwoField): string {
+function missingFirstStepError(field: MissingFirstStepField): string {
   if (field === "email") return "Ingresa un correo válido para recibir tu reporte.";
   if (field === "concern") return "Cuéntanos en pocas palabras tu situación con esta cotización.";
   return MISSING_FILE_ERROR;
@@ -79,16 +79,13 @@ export function flowReducer(state: FlowState, action: FlowAction): FlowState {
     case "fail":
       return { ...state, error: action.error };
     case "back":
-      return state.step > 1
-        ? { ...state, step: (state.step - 1) as 1 | 2, error: null }
-        : state;
+      return state.step === 2 ? { ...state, step: 1, error: null } : state;
     case "next":
-      if (state.step === 1) return { ...state, step: 2, error: null };
-      if (state.step === 2) {
-        const missing = missingStepTwoField(state, action.hasFile);
+      if (state.step === 1) {
+        const missing = missingFirstStepField(state, action.hasFile);
         if (missing)
-          return { ...state, error: missingStepTwoError(missing) };
-        return { ...state, step: 3, error: null };
+          return { ...state, error: missingFirstStepError(missing) };
+        return { ...state, step: 2, error: null };
       }
       return state;
   }
