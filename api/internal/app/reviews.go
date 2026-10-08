@@ -27,15 +27,14 @@ import (
 const maxOrderBytes = 25 * 1024 * 1024
 
 type reviewContext struct {
-	Perspective string `json:"perspective"`
-	Email       string `json:"email"`
-	Concern     string `json:"concern"`
-	AdFBC       string `json:"ad_fbc"`
+	Email   string `json:"email"`
+	Concern string `json:"concern"`
+	AdFBC   string `json:"ad_fbc"`
 }
 
 type preparedFile struct {
 	Temp     *os.File
-	Mime     string
+	Kind     fileKind
 	Size     int64
 	SHA256   string
 	Pages    *int
@@ -59,26 +58,27 @@ func (c *reviewContext) normalize() error {
 	if !validMetaFBC(c.AdFBC) {
 		c.AdFBC = ""
 	}
-	if length := len([]rune(c.Concern)); c.Perspective != "customer" || length < minConcernRunes || length > maxConcernRunes {
+	if length := len([]rune(c.Concern)); length < minConcernRunes || length > maxConcernRunes {
 		return errors.New("invalid context")
 	}
 	return nil
 }
 
-func fileMime(file *os.File) (string, error) {
+func sniffFileKind(file *os.File) (fileKind, error) {
 	header := make([]byte, 512)
 	n, err := file.ReadAt(header, 0)
 	if err != nil && !errors.Is(err, io.EOF) {
-		return "", err
+		return fileKind{}, err
 	}
 	mime := http.DetectContentType(header[:n])
 	if i := strings.IndexByte(mime, ';'); i >= 0 {
 		mime = mime[:i]
 	}
-	if mime != "application/pdf" && mime != "image/png" && mime != "image/jpeg" {
-		return "", errors.New("unsupported file")
+	kind, ok := parseFileKind(mime)
+	if !ok {
+		return fileKind{}, errors.New("unsupported file")
 	}
-	return mime, nil
+	return kind, nil
 }
 
 func validateFile(ctx context.Context, part *multipart.Part, position int, remaining int64) (preparedFile, error) {
@@ -98,15 +98,15 @@ func validateFile(ctx context.Context, part *multipart.Part, position int, remai
 	if length == 0 || length > remaining {
 		return result, errors.New("file limit exceeded")
 	}
-	mime, err := fileMime(file)
+	kind, err := sniffFileKind(file)
 	if err != nil {
 		return result, err
 	}
-	if part.Header.Get("Content-Type") != "" && part.Header.Get("Content-Type") != mime {
+	if part.Header.Get("Content-Type") != "" && part.Header.Get("Content-Type") != kind.mime {
 		return result, errors.New("MIME mismatch")
 	}
-	result.Mime, result.Size, result.Position = mime, length, position
-	if mime == "application/pdf" {
+	result.Kind, result.Size, result.Position = kind, length, position
+	if kind == pdfFile {
 		check, cancel := context.WithTimeout(ctx, 20*time.Second)
 		defer cancel()
 		if err := api.ValidateFile(check, file.Name(), nil, nil); err != nil {
@@ -137,13 +137,31 @@ func validateFile(ctx context.Context, part *multipart.Part, position int, remai
 	return result, nil
 }
 
+type uploadResponse struct {
+	Status      string      `json:"status"`
+	Message     string      `json:"message,omitempty"`
+	ReportToken reportToken `json:"report_token,omitempty"`
+}
+
+// Refusals carry a fixed message; only uploadReady carries a report token.
+var (
+	uploadDisabled      = uploadResponse{Status: "REVIEWS_DISABLED", Message: "Las revisiones aún no están disponibles. No se ha generado ningún reporte ni realizado ningún cobro."}
+	uploadRateLimited   = uploadResponse{Status: "RATE_LIMITED", Message: "Hay varias revisiones en curso o alcanzaste el límite de solicitudes. Inténtalo más tarde."}
+	uploadInvalid       = uploadResponse{Status: "INVALID_UPLOAD", Message: "El archivo está dañado, no coincide con su tipo o supera los límites. Revisa los archivos y vuelve a intentar."}
+	uploadStorageFailed = uploadResponse{Status: "STORAGE_FAILED", Message: "No pudimos guardar la cotización. Inténtalo de nuevo. No se realizó ningún cobro."}
+)
+
+func uploadReady(token reportToken) uploadResponse {
+	return uploadResponse{Status: "READY_FOR_PAYMENT", ReportToken: token}
+}
+
 func (a *App) prepareReview(w http.ResponseWriter, r *http.Request) {
 	if a.Disabled {
-		writeJSON(w, map[string]string{"status": "REVIEWS_DISABLED", "message": "Las revisiones aún no están disponibles. No se ha generado ningún reporte ni realizado ningún cobro."})
+		writeJSON(w, uploadDisabled)
 		return
 	}
 	if !a.allowPrepare(requestIP(r), time.Now()) {
-		writeJSON(w, map[string]string{"status": "RATE_LIMITED", "message": "Hay varias revisiones en curso o alcanzaste el límite de solicitudes. Inténtalo más tarde."})
+		writeJSON(w, uploadRateLimited)
 		return
 	}
 	defer a.donePrepare()
@@ -154,7 +172,7 @@ func (a *App) prepareReview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var contextData reviewContext
-	files := make([]preparedFile, 0, 5)
+	files := make([]preparedFile, 0, maxOrderFiles)
 	defer func() {
 		for _, item := range files {
 			_ = item.Temp.Close()
@@ -179,7 +197,7 @@ func (a *App) prepareReview(w http.ResponseWriter, r *http.Request) {
 			}
 			continue
 		}
-		if len(files) == 5 {
+		if len(files) == maxOrderFiles {
 			http.Error(w, "too many files", http.StatusBadRequest)
 			return
 		}
@@ -189,7 +207,7 @@ func (a *App) prepareReview(w http.ResponseWriter, r *http.Request) {
 				_ = item.Temp.Close()
 				_ = os.Remove(item.Temp.Name())
 			}
-			writeJSON(w, map[string]string{"status": "INVALID_UPLOAD", "message": "El archivo está dañado, no coincide con su tipo o supera los límites. Revisa los archivos y vuelve a intentar."})
+			writeJSON(w, uploadInvalid)
 			return
 		}
 		files = append(files, item)
@@ -204,34 +222,23 @@ func (a *App) prepareReview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	orderID := uuid.NewString()
-	token, tokenHash, err := a.reportToken(orderID)
-	if err != nil {
-		http.Error(w, "unavailable", http.StatusInternalServerError)
-		return
-	}
+	token := a.ReportTokenSecret.token(orderID)
 	tx, err := a.DB.Begin(r.Context())
 	if err != nil {
 		http.Error(w, "unavailable", http.StatusInternalServerError)
 		return
 	}
 	defer tx.Rollback(r.Context())
-	_, err = tx.Exec(r.Context(), `INSERT INTO orders(id,status,report_token_hash,perspective,user_context,email,meta_fbc)
-		VALUES($1,'CREATED',$2,'customer',$3,$4,NULLIF($5,''))`, orderID, tokenHash, contextData.Concern, contextData.Email, contextData.AdFBC)
+	_, err = tx.Exec(r.Context(), `INSERT INTO orders(id,status,report_token_hash,user_context,email,meta_fbc)
+		VALUES($1,'CREATED',$2,$3,$4,NULLIF($5,''))`, orderID, token.hash(), contextData.Concern, contextData.Email, contextData.AdFBC)
 	if err != nil {
 		http.Error(w, "unavailable", http.StatusInternalServerError)
 		return
 	}
 	for i := range files {
-		ext := "pdf"
-		if files[i].Mime == "image/png" {
-			ext = "png"
-		}
-		if files[i].Mime == "image/jpeg" {
-			ext = "jpg"
-		}
-		files[i].Path = fmt.Sprintf("orders/%s/%d.%s", orderID, i, ext)
+		files[i].Path = fmt.Sprintf("orders/%s/%d.%s", orderID, i, files[i].Kind.ext)
 		_, err = tx.Exec(r.Context(), `INSERT INTO order_files(id,order_id,position,blob_path,mime,size_bytes,sha256,pages)
-			VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, uuid.NewString(), orderID, i, files[i].Path, files[i].Mime, files[i].Size, files[i].SHA256, files[i].Pages)
+			VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, uuid.NewString(), orderID, i, files[i].Path, files[i].Kind.mime, files[i].Size, files[i].SHA256, files[i].Pages)
 		if err != nil {
 			http.Error(w, "unavailable", http.StatusInternalServerError)
 			return
@@ -249,10 +256,10 @@ func (a *App) prepareReview(w http.ResponseWriter, r *http.Request) {
 		if _, err := a.DB.Exec(ctx, `UPDATE orders SET status='REJECTED',delete_after=now(),user_context=NULL,email=NULL,updated_at=now() WHERE id=$1 AND status='CREATED'`, orderID); err != nil {
 			CaptureOperationalError("storage_reject_failed", map[string]string{"order_id": orderID})
 		}
-		writeJSON(w, map[string]string{"status": "STORAGE_FAILED", "message": "No pudimos guardar la cotización. Inténtalo de nuevo. No se realizó ningún cobro."})
+		writeJSON(w, uploadStorageFailed)
 		return
 	}
-	writeJSON(w, map[string]string{"status": "READY_FOR_PAYMENT", "report_token": token})
+	writeJSON(w, uploadReady(token))
 }
 
 // stageOriginals writes every validated file to the bucket and only then opens
@@ -262,7 +269,7 @@ func (a *App) stageOriginals(ctx context.Context, orderID string, files []prepar
 		if _, err := item.Temp.Seek(0, io.SeekStart); err != nil {
 			return "temp_read", err
 		}
-		if _, err := a.Bucket.PutObject(ctx, a.BucketName, item.Path, item.Temp, item.Size, minio.PutObjectOptions{ContentType: item.Mime}); err != nil {
+		if _, err := a.Bucket.PutObject(ctx, a.BucketName, item.Path, item.Temp, item.Size, minio.PutObjectOptions{ContentType: item.Kind.mime}); err != nil {
 			return "bucket_write", err
 		}
 	}

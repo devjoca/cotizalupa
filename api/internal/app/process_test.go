@@ -18,8 +18,8 @@ func TestNoAnalysisBeforePaymentInLocalPostgres(t *testing.T) {
 	ctx := context.Background()
 	db := isolatedDB(t)
 	orderID := uuid.NewString()
-	if _, err := db.Exec(ctx, `INSERT INTO orders(id,status,report_token_hash,perspective,user_context)
-		VALUES($1,'READY_FOR_PAYMENT',$2,'customer','synthetic situation')`,
+	if _, err := db.Exec(ctx, `INSERT INTO orders(id,status,report_token_hash,user_context)
+		VALUES($1,'READY_FOR_PAYMENT',$2,'synthetic situation')`,
 		orderID, uuid.NewString()); err != nil {
 		t.Fatal(err)
 	}
@@ -61,8 +61,8 @@ func TestAnalysisFailureRetriesThenFailsInLocalPostgres(t *testing.T) {
 	ctx := context.Background()
 	db := isolatedDB(t)
 	orderID := uuid.NewString()
-	if _, err := db.Exec(ctx, `INSERT INTO orders(id,status,report_token_hash,perspective,user_context,paid_at)
-		VALUES($1,'PAID',$2,'customer','synthetic situation',now())`, orderID, uuid.NewString()); err != nil {
+	if _, err := db.Exec(ctx, `INSERT INTO orders(id,status,report_token_hash,user_context,paid_at)
+		VALUES($1,'PAID',$2,'synthetic situation',now())`, orderID, uuid.NewString()); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(ctx, `INSERT INTO order_files(id,order_id,position,blob_path,mime,size_bytes,sha256)
@@ -90,7 +90,32 @@ func TestAnalysisFailureRetriesThenFailsInLocalPostgres(t *testing.T) {
 	}
 }
 
-func TestLoadAnalysisManifestRejectsOrderWithoutFiles(t *testing.T) {
+// A paid order without the user's situation cannot be analyzed as uploaded;
+// it fails at once instead of burning retries.
+func TestPaidOrderWithoutSituationFailsInLocalPostgres(t *testing.T) {
+	requireLocalDB(t)
+	t.Setenv("AI_STUB", "1")
+	t.Setenv("RAILWAY_ENVIRONMENT_ID", "")
+	ctx := context.Background()
+	db := isolatedDB(t)
+	orderID := uuid.NewString()
+	if _, err := db.Exec(ctx, `INSERT INTO orders(id,status,report_token_hash,paid_at) VALUES($1,'PAID',$2,now())`, orderID, uuid.NewString()); err != nil {
+		t.Fatal(err)
+	}
+	found, err := (&App{DB: db}).processNext(ctx)
+	if err != nil || !found {
+		t.Fatalf("paid order was not claimed: found=%v err=%v", found, err)
+	}
+	var status, lastError string
+	if err := db.QueryRow(ctx, `SELECT status,coalesce(last_error,'') FROM orders WHERE id=$1`, orderID).Scan(&status, &lastError); err != nil {
+		t.Fatal(err)
+	}
+	if status != "PROCESSING_FAILED" || lastError != "order_data_invalid" {
+		t.Fatalf("status=%s last_error=%s, want PROCESSING_FAILED order_data_invalid", status, lastError)
+	}
+}
+
+func TestLoadOrderFilesRejectsOrderWithoutFiles(t *testing.T) {
 	requireLocalDB(t)
 	ctx := context.Background()
 	db := isolatedDB(t)
@@ -99,7 +124,7 @@ func TestLoadAnalysisManifestRejectsOrderWithoutFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _, _ = db.Exec(ctx, `DELETE FROM orders WHERE id=$1`, orderID) })
-	if _, err := (&App{DB: db}).loadAnalysisManifest(ctx, orderID); !errors.Is(err, errInvalidOriginal) {
+	if _, err := (&App{DB: db}).loadOrderFiles(ctx, orderID); !errors.Is(err, errInvalidOriginal) {
 		t.Fatalf("expected an invalid-manifest error, got %v", err)
 	}
 }

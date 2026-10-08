@@ -175,7 +175,6 @@ export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogPro
     try {
       const nextResult = await prepareReview({
         files: fileSnapshot,
-        perspective: "customer",
         context: contextSnapshot,
       });
       if (requestIdRef.current !== requestId) return;

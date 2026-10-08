@@ -89,8 +89,8 @@ func (a *App) deliverReportEmail(ctx context.Context, orderID string) error {
 	if err != nil {
 		return err
 	}
-	token, hash, err := a.reportToken(orderID)
-	if err == nil && hash != expectedHash {
+	token := a.ReportTokenSecret.token(orderID)
+	if token.hash() != tokenHash(expectedHash) {
 		err = errors.New("email_link_unrecoverable")
 	}
 	var providerID string
@@ -98,7 +98,7 @@ func (a *App) deliverReportEmail(ctx context.Context, orderID string) error {
 		if a.PublicURL == nil {
 			err = errors.New("email_public_url_missing")
 		} else {
-			link := a.PublicURL.ResolveReference(&url.URL{Path: "/r/" + token}).String()
+			link := a.PublicURL.ResolveReference(&url.URL{Path: "/r/" + string(token)}).String()
 			providerID, err = a.Mailer.sendReport(ctx, orderID, recipient, link)
 		}
 	}

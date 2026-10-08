@@ -12,10 +12,9 @@ import (
 )
 
 type claimedOrder struct {
-	ID          string
-	Attempts    int
-	Perspective string
-	Concern     *string
+	ID       string
+	Attempts int
+	Concern  *string // nil only for a row the upload path could not write
 }
 
 func (a *App) claimNext(ctx context.Context) (*claimedOrder, error) {
@@ -24,8 +23,7 @@ func (a *App) claimNext(ctx context.Context) (*claimedOrder, error) {
 		WHERE id=(SELECT id FROM orders WHERE status='PAID' OR
 		(status='PROCESSING' AND processing_started_at < now()-interval '15 minutes' AND attempts<3)
 		ORDER BY paid_at FOR UPDATE SKIP LOCKED LIMIT 1)
-		RETURNING id,attempts,coalesce(perspective,''),user_context`).Scan(
-		&order.ID, &order.Attempts, &order.Perspective, &order.Concern)
+		RETURNING id,attempts,user_context`).Scan(&order.ID, &order.Attempts, &order.Concern)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -33,29 +31,6 @@ func (a *App) claimNext(ctx context.Context) (*claimedOrder, error) {
 		return nil, err
 	}
 	return &order, nil
-}
-
-func (a *App) loadAnalysisManifest(ctx context.Context, orderID string) ([]analysisFile, error) {
-	rows, err := a.DB.Query(ctx, `SELECT blob_path,mime,sha256,size_bytes,position FROM order_files WHERE order_id=$1 AND deleted_at IS NULL ORDER BY position`, orderID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	files := make([]analysisFile, 0, 5)
-	for rows.Next() {
-		var file analysisFile
-		if err := rows.Scan(&file.Path, &file.Mime, &file.SHA256, &file.Size, &file.Position); err != nil {
-			return nil, err
-		}
-		files = append(files, file)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	if len(files) == 0 || len(files) > 5 {
-		return nil, errInvalidOriginal
-	}
-	return files, nil
 }
 
 func (a *App) saveReport(ctx context.Context, orderID string, outcome analysisOutcome) error {
@@ -122,17 +97,16 @@ func (a *App) processNext(ctx context.Context) (bool, error) {
 	if err != nil || order == nil {
 		return false, err
 	}
-	if order.Perspective != "customer" {
+	if order.Concern == nil {
 		a.failAnalysis(ctx, *order, errInvalidOriginal)
 		return true, nil
 	}
-	files, err := a.loadAnalysisManifest(ctx, order.ID)
+	files, err := a.loadOrderFiles(ctx, order.ID)
 	if err != nil {
 		a.failAnalysis(ctx, *order, err)
 		return true, nil
 	}
-	contextData := map[string]any{"situation": order.Concern}
-	outcome, err := a.analyze(ctx, files, contextData)
+	outcome, err := a.analyze(ctx, files, analysisContext{Situation: *order.Concern})
 	if err != nil {
 		a.failAnalysis(ctx, *order, err)
 		return true, nil

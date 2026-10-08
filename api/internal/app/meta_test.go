@@ -102,7 +102,7 @@ func TestMetaPurchaseOnlyAfterVerifiedPaymentInLocalPostgres(t *testing.T) {
 }
 
 func TestMetaClickValidation(t *testing.T) {
-	valid := reviewContext{Perspective: "customer", Email: "person@example.test", Concern: "Synthetic concern about delivery", AdFBC: "fb.1.1791500000000.synthetic_click_123"}
+	valid := reviewContext{Email: "person@example.test", Concern: "Synthetic concern about delivery", AdFBC: "fb.1.1791500000000.synthetic_click_123"}
 	if err := valid.normalize(); err != nil || valid.AdFBC == "" {
 		t.Fatalf("valid click dropped: %v", err)
 	}

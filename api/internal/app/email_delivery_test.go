@@ -1,7 +1,6 @@
 package app
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -21,10 +20,10 @@ func TestReportEmailRecoveryInLocalPostgres(t *testing.T) {
 	db := isolatedDB(t)
 	ctx := context.Background()
 	origin, _ := url.Parse("https://example.test")
-	service := &App{DB: db, ReportTokenSecret: bytes.Repeat([]byte{1}, 32), PublicURL: origin, OpenAIModel: "synthetic-model"}
+	service := &App{DB: db, ReportTokenSecret: testTokenSecret, PublicURL: origin, OpenAIModel: "synthetic-model"}
 	order := uuid.NewString()
-	token, hash, _ := service.reportToken(order)
-	_, err := db.Exec(ctx, `INSERT INTO orders(id,status,report_token_hash,email,perspective,user_context) VALUES($1,'PAID',$2,'person@example.test','customer','synthetic situation')`, order, hash)
+	token := service.ReportTokenSecret.token(order)
+	_, err := db.Exec(ctx, `INSERT INTO orders(id,status,report_token_hash,email,user_context) VALUES($1,'PAID',$2,'person@example.test','synthetic situation')`, order, token.hash())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +40,7 @@ func TestReportEmailRecoveryInLocalPostgres(t *testing.T) {
 			t.Fatal(err)
 		}
 		body, _ := io.ReadAll(r.Body)
-		if !strings.Contains(string(body), "/r/"+token) {
+		if !strings.Contains(string(body), "/r/"+string(token)) {
 			t.Fatal("restart link mismatch")
 		}
 		if fail {

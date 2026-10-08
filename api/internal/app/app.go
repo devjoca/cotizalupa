@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -23,7 +22,7 @@ import (
 const defaultAnalysisModel = "gpt-6.1-sol"
 
 type App struct {
-	ReportTokenSecret  []byte
+	ReportTokenSecret  reportTokenSecret
 	Mailer             resendMailer
 	Meta               *metaClient // nil when purchase tracking is off
 	DB                 *pgxpool.Pool
@@ -82,9 +81,11 @@ func New(ctx context.Context) (*App, error) {
 		Mailer:   resendMailer{APIKey: os.Getenv("RESEND_API_KEY"), From: os.Getenv("RESEND_FROM")},
 		Disabled: os.Getenv("REVIEWS_DISABLED") == "true", process: make(chan struct{}, 1), rate: map[string][]time.Time{},
 	}
-	app.ReportTokenSecret, err = hex.DecodeString(os.Getenv("REPORT_TOKEN_SECRET"))
-	if err != nil || len(app.ReportTokenSecret) != 32 || app.Mailer.APIKey == "" || app.Mailer.From == "" {
-		return nil, errors.New("REPORT_TOKEN_SECRET (32 bytes in hex), RESEND_API_KEY and RESEND_FROM are required")
+	if app.ReportTokenSecret, err = parseReportTokenSecret(os.Getenv("REPORT_TOKEN_SECRET")); err != nil {
+		return nil, err
+	}
+	if app.Mailer.APIKey == "" || app.Mailer.From == "" {
+		return nil, errors.New("RESEND_API_KEY and RESEND_FROM are required")
 	}
 	if app.PolarAccessToken == "" || app.PolarProductID == "" || app.PolarWebhookSecret == "" {
 		return nil, errors.New("Polar configuration is required")

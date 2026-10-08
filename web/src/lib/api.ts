@@ -54,11 +54,10 @@ export type PrepareResult =
 
 export function prepareReview(input: {
   files: File[];
-  perspective: "customer";
   context: { email: string; concern: string; ad_fbc?: string };
 }): Promise<PrepareResult> {
   const body = new FormData();
-  body.set("context", JSON.stringify({ perspective: input.perspective, ...input.context }));
+  body.set("context", JSON.stringify(input.context));
   for (const file of input.files) {
     const mime = file.type || extensionToMime(file.name);
     const upload = file.type || !mime ? file : new Blob([file], { type: mime });

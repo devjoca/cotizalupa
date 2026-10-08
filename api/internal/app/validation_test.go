@@ -22,7 +22,7 @@ func TestValidateFileMechanicalRules(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if file.Mime != "application/pdf" || file.Pages == nil || *file.Pages != 1 {
+		if file.Kind != pdfFile || file.Pages == nil || *file.Pages != 1 {
 			t.Fatalf("unexpected result: %+v", file)
 		}
 		if file.Size != int64(len(validPDF)) || file.Position != 0 {
@@ -51,7 +51,7 @@ func TestValidateFileMechanicalRules(t *testing.T) {
 
 	t.Run("accepts a PNG and rejects implausible dimensions", func(t *testing.T) {
 		file, err := validateUpload(t, "quote.png", "image/png", onePagePNG, 0, maxOrderBytes)
-		if err != nil || file.Mime != "image/png" || file.Pages != nil {
+		if err != nil || file.Kind != pngFile || file.Pages != nil {
 			t.Fatalf("valid PNG rejected: %+v (%v)", file, err)
 		}
 		huge := bytes.Clone(onePagePNG)
@@ -67,7 +67,7 @@ func TestValidateFileMechanicalRules(t *testing.T) {
 			t.Fatal(err)
 		}
 		file, err := validateUpload(t, "quote.jpg", "image/jpeg", jpeg, 0, maxOrderBytes)
-		if err != nil || file.Mime != "image/jpeg" {
+		if err != nil || file.Kind != jpegFile {
 			t.Fatalf("valid JPEG rejected: %+v (%v)", file, err)
 		}
 	})

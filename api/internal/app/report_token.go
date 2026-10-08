@@ -30,16 +30,24 @@ func (t reportToken) hash() tokenHash {
 	return tokenHash(hex.EncodeToString(digest[:]))
 }
 
+type reportTokenSecret [32]byte
+
+func parseReportTokenSecret(value string) (reportTokenSecret, error) {
+	var secret reportTokenSecret
+	decoded, err := hex.DecodeString(value)
+	if err != nil || len(decoded) != len(secret) {
+		return secret, errors.New("REPORT_TOKEN_SECRET must be 32 bytes in hex")
+	}
+	copy(secret[:], decoded)
+	return secret, nil
+}
+
 // A stable secret recovers the same private link after a restart. Only its hash
 // enters the database; changing the secret cannot recover existing links.
-func (a *App) reportToken(orderID string) (string, string, error) {
-	if len(a.ReportTokenSecret) != 32 {
-		return "", "", errors.New("report_token_secret_missing")
-	}
-	mac := hmac.New(sha256.New, a.ReportTokenSecret)
+func (s reportTokenSecret) token(orderID string) reportToken {
+	mac := hmac.New(sha256.New, s[:])
 	mac.Write([]byte("cotizalupa/report/v1/" + orderID))
-	token := reportToken(base64.RawURLEncoding.EncodeToString(mac.Sum(nil)))
-	return string(token), string(token.hash()), nil
+	return reportToken(base64.RawURLEncoding.EncodeToString(mac.Sum(nil)))
 }
 
 func validEmail(value string) bool {

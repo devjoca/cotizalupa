@@ -22,7 +22,7 @@ func TestAnalysisRequestPrivacyAndSchema(t *testing.T) {
 	}
 	defer func() { _ = temp.Close(); _ = os.Remove(temp.Name()) }()
 	service := &App{OpenAIModel: defaultAnalysisModel}
-	if err := service.writeAnalysisRequest(context.Background(), temp, nil, map[string]any{"situation": "synthetic"}); err != nil {
+	if err := service.writeAnalysisRequest(context.Background(), temp, nil, analysisContext{Situation: "synthetic"}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := temp.Seek(0, 0); err != nil {
@@ -105,15 +105,15 @@ func TestAnalysisRequestAttachmentsInLocalBucket(t *testing.T) {
 	}
 	content := []byte("synthetic attachment")
 	digest := sha256.Sum256(content)
-	files := make([]analysisFile, 0, 2)
-	for position, mime := range []string{"image/jpeg", "application/pdf"} {
+	files := make([]orderFile, 0, 2)
+	for position, kind := range []fileKind{jpegFile, pdfFile} {
 		path := "tests/" + uuid.NewString()
-		_, err := bucket.PutObject(ctx, name, path, bytes.NewReader(content), int64(len(content)), minio.PutObjectOptions{ContentType: mime})
+		_, err := bucket.PutObject(ctx, name, path, bytes.NewReader(content), int64(len(content)), minio.PutObjectOptions{ContentType: kind.mime})
 		if err != nil {
 			t.Fatal(err)
 		}
 		t.Cleanup(func() { _ = bucket.RemoveObject(ctx, name, path, minio.RemoveObjectOptions{}) })
-		files = append(files, analysisFile{Path: path, Mime: mime, SHA256: hex.EncodeToString(digest[:]), Size: int64(len(content)), Position: position})
+		files = append(files, orderFile{Path: path, Kind: kind, SHA256: hex.EncodeToString(digest[:]), Size: int64(len(content)), Position: position})
 	}
 	temp, err := os.CreateTemp("", "cotizalupa-request-attachments-*")
 	if err != nil {
@@ -121,7 +121,7 @@ func TestAnalysisRequestAttachmentsInLocalBucket(t *testing.T) {
 	}
 	defer func() { _ = temp.Close(); _ = os.Remove(temp.Name()) }()
 	service := &App{OpenAIModel: defaultAnalysisModel, Bucket: bucket, BucketName: name}
-	if err := service.writeAnalysisRequest(ctx, temp, files, nil); err != nil {
+	if err := service.writeAnalysisRequest(ctx, temp, files, analysisContext{}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := temp.Seek(0, 0); err != nil {

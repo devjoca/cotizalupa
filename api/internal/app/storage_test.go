@@ -97,12 +97,12 @@ func TestPrepareReviewStagesOriginalsInLocalPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	service := &App{DB: db, Bucket: bucket, BucketName: "test", ReportTokenSecret: make([]byte, 32), rate: map[string][]time.Time{}}
+	service := &App{DB: db, Bucket: bucket, BucketName: "test", rate: map[string][]time.Time{}}
 
 	upload := func(ip string) (string, string) {
 		var body bytes.Buffer
 		writer := multipart.NewWriter(&body)
-		_ = writer.WriteField("context", `{"perspective":"customer","concern":"Estoy por aceptar o pagar un adelanto.","email":"cliente@example.com"}`)
+		_ = writer.WriteField("context", `{"concern":"Estoy por aceptar o pagar un adelanto.","email":"cliente@example.com"}`)
 		header := textproto.MIMEHeader{}
 		header.Set("Content-Disposition", `form-data; name="files"; filename="quote.png"`)
 		header.Set("Content-Type", "image/png")

@@ -29,10 +29,30 @@ var analysisSchema []byte
 
 var currencyPattern = regexp.MustCompile(`^[A-Z]{3}$`)
 
+type gapStatus string
+
+const (
+	gapMissing   gapStatus = "missing"
+	gapAmbiguous gapStatus = "ambiguous"
+)
+
+func (s *gapStatus) UnmarshalJSON(raw []byte) error {
+	var value string
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return err
+	}
+	switch status := gapStatus(value); status {
+	case gapMissing, gapAmbiguous:
+		*s = status
+		return nil
+	}
+	return errors.New("invalid gap status")
+}
+
 type analysis struct {
 	Document struct {
 		IsQuotation                bool    `json:"is_quotation"`
-		QuotationCount             float64 `json:"quotation_count"`
+		QuotationCount             int     `json:"quotation_count"`
 		IsLegible                  bool    `json:"is_legible"`
 		IsSingleCommercialProposal bool    `json:"is_single_commercial_proposal"`
 		RejectionReason            *string `json:"rejection_reason"`
@@ -42,12 +62,12 @@ type analysis struct {
 		Detail string `json:"detail"`
 	} `json:"clear_items"`
 	Gaps []struct {
-		Title             string  `json:"title"`
-		Status            string  `json:"status"`
-		Evidence          *string `json:"evidence"`
-		Missing           *string `json:"missing"`
-		WhyItMatters      string  `json:"why_it_matters"`
-		SuggestedQuestion string  `json:"suggested_question"`
+		Title             string    `json:"title"`
+		Status            gapStatus `json:"status"`
+		Evidence          *string   `json:"evidence"`
+		Missing           *string   `json:"missing"`
+		WhyItMatters      string    `json:"why_it_matters"`
+		SuggestedQuestion string    `json:"suggested_question"`
 	} `json:"gaps"`
 	WhatIf         []string `json:"what_if"`
 	Priorities     []string `json:"priorities"`
@@ -56,8 +76,8 @@ type analysis struct {
 		Service      *string `json:"service"`
 		Supplier     *string `json:"supplier"`
 		Amount       struct {
-			ValueCents *float64 `json:"value_cents"`
-			Currency   *string  `json:"currency"`
+			ValueCents *int64  `json:"value_cents"`
+			Currency   *string `json:"currency"`
 		} `json:"amount"`
 		Summary         *string `json:"summary"`
 		ScopeSummary    *string `json:"scope_summary"`
@@ -76,16 +96,11 @@ func parseAnalysis(raw []byte) (analysis, error) {
 	if err := decoder.Decode(&result); err != nil {
 		return result, err
 	}
-	if result.Document.QuotationCount < 0 || result.Document.QuotationCount != float64(int(result.Document.QuotationCount)) {
+	if result.Document.QuotationCount < 0 {
 		return result, errors.New("invalid quotation count")
 	}
 	if len(result.ClearItems)+len(result.Gaps) > 8 || len(result.WhatIf) > 3 || len(result.Priorities) > 3 {
 		return result, errors.New("too many findings")
-	}
-	for _, gap := range result.Gaps {
-		if gap.Status != "missing" && gap.Status != "ambiguous" {
-			return result, errors.New("invalid gap status")
-		}
 	}
 	if result.analyzable() {
 		if result.Document.RejectionReason != nil || result.QuotationFacts == nil {
@@ -96,7 +111,7 @@ func parseAnalysis(raw []byte) (analysis, error) {
 			return result, errors.New("invalid facts document type")
 		}
 		amount := facts.Amount.ValueCents
-		if amount != nil && (*amount < 0 || *amount != float64(int64(*amount)) || facts.Amount.Currency == nil) {
+		if amount != nil && (*amount < 0 || facts.Amount.Currency == nil) {
 			return result, errors.New("invalid facts amount")
 		}
 		if facts.Amount.Currency != nil && !currencyPattern.MatchString(*facts.Amount.Currency) {
@@ -161,10 +176,9 @@ func (a analysis) analyzable() bool {
 	return a.Document.IsQuotation && a.Document.IsLegible && a.Document.QuotationCount == 1 && a.Document.IsSingleCommercialProposal
 }
 
-type analysisFile struct {
-	Path, Mime, SHA256 string
-	Size               int64
-	Position           int
+// analysisContext is what the user declared; the prompt marks it untrusted.
+type analysisContext struct {
+	Situation string `json:"situation"`
 }
 
 type analysisOutcome struct {
@@ -176,7 +190,7 @@ type analysisOutcome struct {
 
 func jsonString(value string) string { encoded, _ := json.Marshal(value); return string(encoded) }
 
-func (a *App) writeAnalysisRequest(ctx context.Context, target *os.File, files []analysisFile, contextData map[string]any) error {
+func (a *App) writeAnalysisRequest(ctx context.Context, target *os.File, files []orderFile, contextData analysisContext) error {
 	contextJSON, err := json.Marshal(contextData)
 	if err != nil {
 		return err
@@ -191,8 +205,8 @@ func (a *App) writeAnalysisRequest(ctx context.Context, target *os.File, files [
 		if err != nil {
 			return err
 		}
-		prefix, suffix := `,{"type":"input_image","image_url":"data:`+file.Mime+`;base64,`, `","detail":"high"}`
-		if file.Mime == "application/pdf" {
+		prefix, suffix := `,{"type":"input_image","image_url":"data:`+file.Kind.mime+`;base64,`, `","detail":"high"}`
+		if file.Kind == pdfFile {
 			prefix = `,{"type":"input_file","filename":` + jsonString(fmt.Sprintf("cotizacion-%d.pdf", file.Position+1)) + `,"file_data":"data:application/pdf;base64,`
 			suffix = `"}`
 		}
@@ -225,13 +239,15 @@ func (a *App) writeAnalysisRequest(ctx context.Context, target *os.File, files [
 	return err
 }
 
-func (a *App) analyze(ctx context.Context, files []analysisFile, contextData map[string]any) (analysisOutcome, error) {
+func (a *App) analyze(ctx context.Context, files []orderFile, contextData analysisContext) (analysisOutcome, error) {
 	var outcome analysisOutcome
 	if os.Getenv("AI_STUB") == "1" && os.Getenv("RAILWAY_ENVIRONMENT_ID") == "" {
 		stub := []byte(`{"document":{"is_quotation":true,"quotation_count":1,"is_legible":true,"is_single_commercial_proposal":true,"rejection_reason":null},"clear_items":[{"title":"[STUB] Análisis local sin modelo","detail":"Respuesta fija de desarrollo."}],"gaps":[],"what_if":[],"priorities":[],"quotation_facts":{"document_type":"quotation","service":null,"supplier":null,"amount":{"value_cents":null,"currency":null},"summary":null,"scope_summary":null,"delivery_summary":null,"payment_summary":null}}`)
-		outcome.Result, _ = parseAnalysis(stub)
-		outcome.Model = "stub"
-		return outcome, nil
+		result, err := parseAnalysis(stub)
+		if err != nil {
+			return outcome, err
+		}
+		return analysisOutcome{Result: result, Model: "stub"}, nil
 	}
 	if a.OpenAIKey == "" {
 		return outcome, errors.New("analysis_not_configured")

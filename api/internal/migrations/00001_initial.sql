@@ -4,7 +4,7 @@ CREATE TABLE "order_files" (
 	"order_id" uuid NOT NULL,
 	"position" smallint NOT NULL,
 	"blob_path" text NOT NULL,
-	"mime" text NOT NULL,
+	"mime" text NOT NULL CHECK ("mime" IN ('application/pdf','image/png','image/jpeg')),
 	"size_bytes" integer NOT NULL,
 	"sha256" text NOT NULL,
 	"pages" integer,
@@ -15,8 +15,8 @@ CREATE TABLE "order_files" (
 
 CREATE TABLE "orders" (
 	"id" uuid PRIMARY KEY NOT NULL,
-	"status" text NOT NULL,
-	"perspective" text,
+	"status" text NOT NULL CHECK ("status" IN ('CREATED','READY_FOR_PAYMENT','REJECTED','PAYMENT_PENDING','PAID',
+		'PROCESSING','COMPLETED','PROCESSING_FAILED','EXPIRED','REFUNDED')),
 	"user_context" text,
 	"email" text,
 	"report_email_first_attempt_at" timestamp with time zone,

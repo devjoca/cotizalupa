@@ -1,7 +1,6 @@
 package app
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -14,34 +13,37 @@ import (
 func TestPublicReportOrderStates(t *testing.T) {
 	requireLocalDB(t)
 	db := isolatedDB(t)
-	service := &App{DB: db, ReportTokenSecret: bytes.Repeat([]byte{1}, 32)}
-	for _, test := range []struct {
-		orderStatus string
-		wantStatus  string
-	}{
-		{"CREATED", "NOT_READY"},
-		{"READY_FOR_PAYMENT", "READY_FOR_PAYMENT"},
-		{"REJECTED", "REJECTED"},
-		{"PAYMENT_PENDING", "PAYMENT_PENDING"},
-		{"PAID", "PROCESSING"},
-		{"PROCESSING", "PROCESSING"},
-		{"PROCESSING_FAILED", "FAILED"},
-		{"EXPIRED", "EXPIRED"},
-		{"REFUNDED", "REFUNDED"},
-	} {
+	service := &App{DB: db, ReportTokenSecret: testTokenSecret}
+	// Every order status needs a public answer; a status added without one
+	// fails here. COMPLETED has no saved report in this fixture.
+	want := map[orderStatus]string{
+		statusCreated:          "NOT_READY",
+		statusReadyForPayment:  "READY_FOR_PAYMENT",
+		statusRejected:         "REJECTED",
+		statusPaymentPending:   "PAYMENT_PENDING",
+		statusPaid:             "PROCESSING",
+		statusProcessing:       "PROCESSING",
+		statusCompleted:        "UNAVAILABLE",
+		statusProcessingFailed: "FAILED",
+		statusExpired:          "EXPIRED",
+		statusRefunded:         "REFUNDED",
+	}
+	for _, status := range orderStatuses {
+		wantStatus, ok := want[status]
+		if !ok {
+			t.Fatalf("no expected public state for %s", status)
+		}
+		test := struct{ orderStatus, wantStatus string }{string(status), wantStatus}
 		t.Run(test.orderStatus, func(t *testing.T) {
 			orderID := uuid.NewString()
-			token, hash, err := service.reportToken(orderID)
-			if err != nil {
-				t.Fatal(err)
-			}
+			token := service.ReportTokenSecret.token(orderID)
 			if _, err := db.Exec(context.Background(),
 				`INSERT INTO orders(id,status,report_token_hash) VALUES($1,$2,$3)`,
-				orderID, test.orderStatus, hash); err != nil {
+				orderID, test.orderStatus, token.hash()); err != nil {
 				t.Fatal(err)
 			}
-			request := httptest.NewRequest(http.MethodGet, "/api/reports/"+token, nil)
-			request.SetPathValue("token", token)
+			request := httptest.NewRequest(http.MethodGet, "/api/reports/"+string(token), nil)
+			request.SetPathValue("token", string(token))
 			response := httptest.NewRecorder()
 			service.getReport(response, request)
 			var result struct {
