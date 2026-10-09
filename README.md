@@ -65,13 +65,14 @@ pnpm dev:infra:down
 
 ## Deployment
 
-Create an empty production Postgres database. Run `./cotizalupa migrate` as
+Create an empty production Postgres database. Run `./out migrate` as
 the Railway pre-deploy command before the API starts. Goose creates the schema
 and applies all shipped migrations.
 
-Set the Railway service root directory to `/api`. Its `Dockerfile` builds
-the Go API image only, using `api/` as the build context. Locally, the equivalent
-is `docker build -f api/Dockerfile api`.
+Set the Railway service root directory to `/api` and the builder to Railpack.
+Leave the build and start command overrides empty. Railpack reads the Go version
+from `go.mod`, builds `cmd/cotizalupa` into `out`, and starts it with `./out`.
+Remove any `RAILWAY_DOCKERFILE_PATH` override left from the Docker setup.
 Cloudflare Pages builds the frontend from the repository root (`pnpm build` with
 `VITE_API_URL=https://api.cotizalupa.com`). The Pages build fails without
 `VITE_API_URL`, so a deployed frontend can never silently call localhost or
