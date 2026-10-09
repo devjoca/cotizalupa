@@ -131,12 +131,37 @@
   margin: 8px 0 0;
 }
 
-.report-finding blockquote {
-  margin: 12px 0;
-  padding: 4px 16px;
+.report-label {
   color: var(--report-ink);
+  font-weight: 600;
+}
+
+.report-finding .report-evidence {
+  margin: 10px 0 12px;
+  padding: 2px 0 2px 14px;
   border-left: 2px solid #c9bda9;
-  font: italic 20px/1.45 var(--display, Georgia, serif);
+  font-size: 15px;
+}
+
+.report-copy-all {
+  margin: -4px 0 26px;
+}
+
+.report-copy-all button {
+  padding: 9px 16px;
+  color: var(--report-accent);
+  background: transparent;
+  border: 1px solid currentColor;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.report-copy-all p {
+  margin: 12px 0 0;
+  padding: 16px 18px;
+  white-space: pre-wrap;
+  background: #f4f1e8;
 }
 
 .report-document .copy-box {
@@ -144,6 +169,16 @@
   padding: 16px 18px;
   background: #f4f1e8;
   border: 0;
+}
+
+.copy-box__label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--report-muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
 }
 
 .report-document .copy-box p {
@@ -251,11 +286,8 @@
     margin-top: 22pt;
   }
 
-  .report-finding blockquote {
-    font-size: 14pt;
-  }
-
-  .report-document .copy-box button {
+  .report-document .copy-box button,
+  .report-copy-all {
     display: none;
   }
 
