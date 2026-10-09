@@ -1,0 +1,186 @@
+:root {
+  --report-ink: #282823;
+  --report-muted: #66665e;
+  --report-accent: #b33127;
+  --report-line: #cccac1;
+  --report-paper: #fffefa;
+  --report-bg: #eeede7;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--report-ink);
+  background: var(--report-bg);
+  font: 16px/1.65 "Libre Franklin", system-ui, sans-serif;
+}
+
+button,
+a {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid var(--report-accent);
+  outline-offset: 4px;
+}
+
+.report-page {
+  width: min(900px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 56px 0;
+}
+
+.report-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 18px;
+}
+
+.report-nav a,
+.report-nav button {
+  display: inline-block;
+  color: var(--report-accent);
+  background: transparent;
+  border: 0;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  text-underline-offset: 4px;
+}
+
+.report-nav button {
+  padding: 8px 0;
+  cursor: pointer;
+}
+
+.report-nav a:hover,
+.report-nav button:hover {
+  text-decoration: underline;
+}
+
+.report-page--state {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+}
+
+.report-state {
+  max-width: 650px;
+  padding: 44px;
+  background: var(--report-paper);
+  border: 1px solid var(--report-line);
+  box-shadow: 8px 8px 0 #d8d6cc;
+}
+
+.report-state h1 {
+  margin: 0;
+  font: 400 clamp(38px, 7vw, 62px)/1.04 Georgia, serif;
+  letter-spacing: -2px;
+}
+
+.report-state__eyebrow {
+  margin: 52px 0 14px;
+  color: var(--report-accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+}
+
+.report-state > p:not(.report-state__eyebrow) {
+  margin: 22px 0 0;
+  color: var(--report-muted);
+}
+
+.report-state > button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  margin-top: 28px;
+  padding: 12px 22px;
+  border: 1px solid var(--report-accent);
+  border-radius: 4px;
+  color: var(--report-paper);
+  background: var(--report-accent);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.report-state > button:hover:not(:disabled) {
+  background: #96291f;
+  border-color: #96291f;
+}
+
+.report-state > button:disabled {
+  opacity: .6;
+  cursor: wait;
+}
+
+.report-state__link {
+  display: block;
+  width: fit-content;
+  margin-top: 20px;
+  padding: 8px 0;
+  color: var(--report-accent);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+@media (max-width: 640px) {
+  .report-page {
+    width: min(100% - 24px, 900px);
+    padding: 12px 0 24px;
+  }
+
+  .report-nav {
+    margin: 6px 0 14px;
+  }
+
+  .report-state {
+    padding: 22px;
+  }
+
+  .report-state > button {
+    width: 100%;
+  }
+
+  .report-state__eyebrow {
+    margin-top: 42px;
+  }
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+
+  body {
+    background: #fff;
+    print-color-adjust: exact;
+  }
+
+  .report-page {
+    width: auto;
+    margin: 0;
+    padding: 0;
+  }
+
+  .report-nav {
+    display: none;
+  }
+}

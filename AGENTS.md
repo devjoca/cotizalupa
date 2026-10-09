@@ -35,6 +35,7 @@ Ambitious ideas, simple systems, software that feels obvious. Smallest model tha
 - [ ] `CREATED`→`REJECTED` (storage failure); `CREATED`/`READY_FOR_PAYMENT`→`EXPIRED` (30 days); `PAYMENT_PENDING` never stalls (reconciliation, 3-attempt cap, drain releases freezes); `PROCESSING`→`COMPLETED`/`PROCESSING_FAILED`; `PROCESSING_FAILED`→`REFUNDED` (manual provider refund).
 - [ ] Files frozen from `PAYMENT_PENDING`: validated = charged = analyzed. Edits → new order.
 - [ ] `/r/{token}` looks up `sha256(token)`, carries no Meta pixel, renders persisted state/report. Email required before checkout; link sent only after the report is saved.
+- [ ] Meta purchase tracking is CAPI only, after verified payment for an order with an ad click ID. No quotation content, email, or private report token goes to Meta.
 - [ ] Quotation content stays out of logs and operational metadata.
 
 ## Dev

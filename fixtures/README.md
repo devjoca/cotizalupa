@@ -1,15 +1,14 @@
-# Eval fixtures (pnpm eval — calls the model, costs money, run by hand)
+# Synthetic test documents
 
-Drop the 8 PDFs from PLAN.md "Tests" here:
+`valid-tiny.jpg` is a tiny synthetic JPEG. Everything else is generated in memory
+by the Go tests (`api/internal/app/testsupport_test.go`): one-page and multi-page PDFs,
+PNGs, and the malformed or oversized variants. No customer original belongs here.
 
-- normal-quotation.pdf
-- quotation-without-price.pdf
-- quotation-with-options.pdf
-- quotation-with-annex.pdf
-- multiple-quotations.pdf
-- invoice.pdf
-- unreadable.pdf
-- ten-page-quotation.pdf
+The validation tests run without calling any model and cover the mechanical
+limits: file count, total size, page count, MIME mismatch, and image dimensions.
+The order-flow tests use synthetic documents to verify that no analysis runs
+before payment and that a paid order ends in a persisted report.
 
-The eval runner prints hits over total. Guideline 9/10, not a strict pass/fail.
-// TODO: phase 2 — eval/analysis.eval.ts
+There is no paid eval runner. Review a few model-generated reports manually
+before selling. Add synthetic equivalents of useful failure cases to the Go tests;
+never copy customer originals here.
