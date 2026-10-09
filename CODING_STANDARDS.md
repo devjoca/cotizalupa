@@ -6,6 +6,12 @@ Read this when writing or reviewing code. AGENTS.md owns product scope, flow, an
 
 - Complexity belongs at the adapter boundary (payments, OpenAI, bucket). Order logic
   stays plain: status values in the DB plus conditional updates, no state-machine library.
+- KISS first: smallest diff that does the task. No speculative layers, no
+  "while I'm here" refactors.
+- Pre-refactor only if it makes this change easier or removes slop you are
+  touching. Otherwise leave it and say so in one sentence.
+- Wider split/rename/abstract → stop and ask via the question tool (minimal now
+  vs refactor-first, with cost/payoff). Never bundle silent refactors into a fix/feature.
 
 ## Gaps and unknowns
 
