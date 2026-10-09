@@ -10,7 +10,7 @@ function wrap(n: number) {
   return (n + HERO_EXAMPLES.length) % HERO_EXAMPLES.length;
 }
 
-export function HeroRotator() {
+export function HeroRotator({ onShowExample }: { onShowExample: (exampleId: string) => void }) {
   const [index, setIndex] = useState(0);
   const [fading, setFading] = useState(false);
   const [paused, setPaused] = useState(false);
@@ -73,7 +73,7 @@ export function HeroRotator() {
     >
       <div className="preview-top">
         <span className="eyebrow">UN HALLAZGO DEL REPORTE</span>
-        <span className="example-tag">Ejemplo ilustrativo</span>
+        <span className="example-tag">Cotización ficticia</span>
       </div>
       <div className={`hero-rot${fading ? " is-fading" : ""}`}>
         <div className="quote-paper">
@@ -107,7 +107,7 @@ export function HeroRotator() {
         <div className="copy-preview">
           <span className="label">PREGUNTA PARA TU PROVEEDOR</span>
           <p>“{example.suggestedQuestion}”</p>
-          <a href="#ejemplo">
+          <a href="#ejemplo" onClick={() => onShowExample(example.exampleId)}>
             Ver el reporte de ejemplo <Icon name="arrow-up-right" />
           </a>
         </div>
@@ -127,7 +127,13 @@ export function HeroRotator() {
   );
 }
 
-export function Hero({ onStart }: { onStart: () => void }) {
+export function Hero({
+  onStart,
+  onShowExample,
+}: {
+  onStart: () => void;
+  onShowExample: (exampleId: string) => void;
+}) {
   return (
     <section className="hero">
       <div className="hero-copy">
@@ -156,7 +162,7 @@ export function Hero({ onStart }: { onStart: () => void }) {
           Sin cuenta <span>·</span> PDF, foto o captura
         </div>
       </div>
-      <HeroRotator />
+      <HeroRotator onShowExample={onShowExample} />
     </section>
   );
 }

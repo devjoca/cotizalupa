@@ -17,6 +17,22 @@ dialog{border-radius:2px;background:var(--paper);border:1px solid var(--line)}di
 .flow-demo-link .icon{margin-left:7px}
 .flow-actions .icon{width:1.05em;height:1.05em}
 
+.category-strip>span{max-width:none;white-space:nowrap}
+.category-strip>.category-marquee{display:block;min-width:0;overflow:hidden;mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent)}
+.category-track{display:flex;width:max-content;animation:category-scroll 80s linear infinite}
+.category-strip:hover .category-track{animation-play-state:paused}
+.category-track ul{display:flex;margin:0;padding:0;list-style:none}
+.category-track li{display:flex;align-items:center;white-space:nowrap}
+.category-track li:after{content:'✳';margin:0 22px;color:var(--blue);font-size:13px}
+@keyframes category-scroll{to{transform:translateX(-50%)}}
+@media(prefers-reduced-motion:reduce){.category-strip>.category-marquee{overflow-x:auto;scrollbar-width:thin;mask-image:linear-gradient(90deg,#000 90%,transparent)}.category-track ul[aria-hidden],.category-track li:last-child:after{display:none}}
+
+.source-thumb{display:block;margin:4px 0 22px;border:1px solid var(--line);background:#fff;box-shadow:4px 5px 0 #dcdad0}
+.source-thumb img{display:block;width:100%;height:auto}
+.source-card .source-situation{font:italic 18px/1.5 var(--display);margin-top:8px}
+/* A sticky intro taller than the viewport would hide the note on short screens. */
+@media(max-height:900px){.example-intro{position:static}}
+
 .availability-note{max-width:1440px;margin:auto;padding:14px 5%;background:var(--lime);font-size:14px;border-bottom:1px solid var(--line)}
 .footer-links{display:flex;flex-wrap:wrap;gap:10px 20px;font-size:14px}
 .footer-links a,.privacy-note a{text-decoration:underline;text-underline-offset:3px}

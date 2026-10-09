@@ -4,6 +4,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { rememberMetaClick } from "../lib/adAttribution";
 
 import { Hero } from "../components/landing/Hero";
+import { CategoryStrip } from "../components/landing/CategoryStrip";
+import { LANDING_EXAMPLES } from "../components/landing/content";
 import { RoleCards } from "../components/landing/RoleCards";
 import { Example } from "../components/landing/Example";
 import { Method } from "../components/landing/Method";
@@ -55,6 +57,7 @@ function Landing() {
   }, []);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [flowKey, setFlowKey] = useState(0);
+  const [exampleId, setExampleId] = useState(LANDING_EXAMPLES[0].id);
 
   // Iteration 1 is cliente-only: every entry point opens the same client flow.
   function startFlow() {
@@ -84,17 +87,10 @@ function Landing() {
         <div className="availability-note" role="status">
           Revisa tus archivos antes de crear una orden. El pago único de $9.99 USD se abre desde el enlace privado; la IA analiza después de la confirmación.
         </div>
-        <Hero onStart={startFlow} />
-        <div className="category-strip">
-          <div>
-            Muebles a medida <i aria-hidden="true">✳</i> Remodelaciones{" "}
-            <i aria-hidden="true">✳</i> Desarrollo web{" "}
-            <i aria-hidden="true">✳</i> Eventos <i aria-hidden="true">✳</i>{" "}
-            Y mucho más
-          </div>
-        </div>
+        <Hero onStart={startFlow} onShowExample={setExampleId} />
+        <CategoryStrip />
         <RoleCards onStart={startFlow} />
-        <Example />
+        <Example activeId={exampleId} onSelect={setExampleId} />
         <Method />
         <Pricing onStart={startFlow} />
         <Faq />
