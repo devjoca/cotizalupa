@@ -145,7 +145,6 @@ type uploadResponse struct {
 
 // Refusals carry a fixed message; only uploadReady carries a report token.
 var (
-	uploadDisabled      = uploadResponse{Status: "REVIEWS_DISABLED", Message: "Las revisiones aún no están disponibles. No se ha generado ningún reporte ni realizado ningún cobro."}
 	uploadRateLimited   = uploadResponse{Status: "RATE_LIMITED", Message: "Hay varias revisiones en curso o alcanzaste el límite de solicitudes. Inténtalo más tarde."}
 	uploadInvalid       = uploadResponse{Status: "INVALID_UPLOAD", Message: "El archivo está dañado, no coincide con su tipo o supera los límites. Revisa los archivos y vuelve a intentar."}
 	uploadStorageFailed = uploadResponse{Status: "STORAGE_FAILED", Message: "No pudimos guardar la cotización. Inténtalo de nuevo. No se realizó ningún cobro."}
@@ -156,10 +155,6 @@ func uploadReady(token reportToken) uploadResponse {
 }
 
 func (a *App) prepareReview(w http.ResponseWriter, r *http.Request) {
-	if a.Disabled {
-		writeJSON(w, uploadDisabled)
-		return
-	}
 	if !a.allowPrepare(requestIP(r), time.Now()) {
 		writeJSON(w, uploadRateLimited)
 		return

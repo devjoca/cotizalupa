@@ -112,11 +112,6 @@ the quotation, email, or private report link. Check received events in Meta's
 test tools before buying traffic. If Meta is unavailable, payment and analysis
 continue; `pnpm ops:drain` also retries eligible deliveries.
 
-To pause submissions on a deployed service, set `REVIEWS_DISABLED=true` in
-Railway's deployment environment and restart the service. Only the exact value
-`true` pauses the final submit and order-preparation endpoint. Unset or `false`
-allows mechanical validation, storage and Polar checkout, but does not enable free full analysis.
-
 No model runs before payment. The form preview is local; it does not certify
 legibility or content. Every paid order gets a best-effort report; manual refunds cover system failures only.
 Paid jobs default to `gpt-6.1-sol` with medium reasoning effort;

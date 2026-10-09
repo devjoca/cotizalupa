@@ -35,7 +35,6 @@ type App struct {
 	PublicURL          *url.URL
 	OpenAIKey          string
 	OpenAIModel        string
-	Disabled           bool
 	process            chan struct{}
 	guardMu            sync.Mutex
 	rate               map[string][]time.Time
@@ -78,8 +77,8 @@ func New(ctx context.Context) (*App, error) {
 		PolarAccessToken: os.Getenv("POLAR_ACCESS_TOKEN"), PolarProductID: os.Getenv("POLAR_PRODUCT_ID"),
 		PolarWebhookSecret: os.Getenv("POLAR_WEBHOOK_SECRET"), PolarBaseURL: polarBase,
 		PublicURL: publicURL, OpenAIKey: os.Getenv("OPENAI_API_KEY"), OpenAIModel: os.Getenv("OPENAI_ANALYSIS_MODEL"),
-		Mailer:   resendMailer{APIKey: os.Getenv("RESEND_API_KEY"), From: os.Getenv("RESEND_FROM")},
-		Disabled: os.Getenv("REVIEWS_DISABLED") == "true", process: make(chan struct{}, 1), rate: map[string][]time.Time{},
+		Mailer:  resendMailer{APIKey: os.Getenv("RESEND_API_KEY"), From: os.Getenv("RESEND_FROM")},
+		process: make(chan struct{}, 1), rate: map[string][]time.Time{},
 	}
 	if app.ReportTokenSecret, err = parseReportTokenSecret(os.Getenv("REPORT_TOKEN_SECRET")); err != nil {
 		return nil, err
@@ -145,11 +144,6 @@ func (a *App) Close() { a.DB.Close() }
 
 func (a *App) Handler() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/availability", func(w http.ResponseWriter, _ *http.Request) {
-		writeJSON(w, struct {
-			ReviewsDisabled bool `json:"reviewsDisabled"`
-		}{a.Disabled})
-	})
 	mux.HandleFunc("POST /api/reviews", a.prepareReview)
 	mux.HandleFunc("GET /api/reports/{token}", a.getReport)
 	mux.HandleFunc("POST /api/checkouts", a.checkout)

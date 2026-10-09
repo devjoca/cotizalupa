@@ -17,7 +17,6 @@ import {
 
 interface ReviewDialogProps {
   open: boolean;
-  reviewsDisabled: boolean;
   onClose: () => void;
 }
 
@@ -59,10 +58,8 @@ function scrollToExample() {
     ?.focus({ preventScroll: true });
 }
 
-export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogProps) {
+export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
   const navigate = useNavigate();
-  const [serverDisabled, setServerDisabled] = useState(false);
-  const disabled = reviewsDisabled || serverDisabled;
   const [state, dispatch] = useReducer(flowReducer, initialFlowState);
   const [files, setFiles] = useState<File[]>([]);
   const [filesConfirmed, setFilesConfirmed] = useState(false);
@@ -144,7 +141,7 @@ export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogPro
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (state.step === 1) {
-      const missing = missingFirstStepField(state, disabled || files.length > 0);
+      const missing = missingFirstStepField(state, files.length > 0);
       if (missing === "file") {
         fileInputRef.current?.focus();
       } else if (missing) {
@@ -153,12 +150,12 @@ export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogPro
           ?.focus();
       }
     }
-    dispatch({ type: "next", hasFile: disabled || files.length > 0 });
+    dispatch({ type: "next", hasFile: files.length > 0 });
   }
 
   // Preparation returns the private link later used for checkout and report.
   async function createReviewOrder() {
-    if (disabled || files.length === 0 || preparing) return;
+    if (files.length === 0 || preparing) return;
     if (!filesConfirmed) {
       setPreparationError("Confirma que revisaste todos los archivos antes de continuar.");
       return;
@@ -195,7 +192,6 @@ export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogPro
         });
         return;
       }
-      if (nextResult.status === "REVIEWS_DISABLED") setServerDisabled(true);
       setPreparationError(nextResult.message);
     } catch {
       if (requestIdRef.current === requestId) {
@@ -254,12 +250,6 @@ export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogPro
       </div>
       <form id="review-form" noValidate onSubmit={submit}>
         <div id="flow-content">
-          {disabled && (
-            <p className="demo-banner" role="status">
-              Las revisiones aún no están disponibles. Puedes explorar el formulario
-              y ver el reporte de ejemplo. Los archivos que selecciones no se enviarán.
-            </p>
-          )}
           {state.step === 1 && (
             <>
               <h2 id="flow-title" tabIndex={-1}>
@@ -355,9 +345,7 @@ export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogPro
                 Revisa antes de pagar
               </h2>
               <p>
-                {disabled
-                  ? "Así será el resumen de tu revisión. La generación está deshabilitada."
-                  : "Abre cada archivo y comprueba que todas las páginas sean de una sola cotización, de un proveedor, y que los textos y montos se lean. La revisión se basará en lo que envíes."}
+                Abre cada archivo y comprueba que todas las páginas sean de una sola cotización, de un proveedor, y que los textos y montos se lean. La revisión se basará en lo que envíes.
               </p>
               {open && files.length > 0 ? (
                 <ul className="file-previews">
@@ -418,9 +406,7 @@ export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogPro
               <div className="demo-banner">
                 <strong>Crear la orden no realiza ningún cobro.</strong>
                 <br />
-                {disabled
-                  ? "La generación de reportes está deshabilitada."
-                  : "Guardaremos tus archivos y te daremos un enlace privado. Desde allí podrás abrir el pago. El análisis comenzará después de que Polar confirme el pago."}
+                Guardaremos tus archivos y te daremos un enlace privado. Desde allí podrás abrir el pago. El análisis comenzará después de que Polar confirme el pago.
               </div>
               <button
                 type="button"
@@ -461,14 +447,10 @@ export function ReviewDialog({ open, onClose, reviewsDisabled }: ReviewDialogPro
               type="button"
               className="button blue"
               id="next"
-              disabled={disabled || files.length === 0 || !filesConfirmed || preparing}
+              disabled={files.length === 0 || !filesConfirmed || preparing}
               onClick={createReviewOrder}
             >
-              {disabled
-                ? "Revisiones no disponibles"
-                : preparing
-                  ? "Abriendo el pago…"
-                  : "Continuar al pago"}
+              {preparing ? "Abriendo el pago…" : "Continuar al pago"}
             </button>
           ) : (
             <button type="submit" className="button blue" id="next">

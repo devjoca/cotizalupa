@@ -17,14 +17,10 @@ func corsTestApp(t *testing.T, frontend string) *App {
 	return &App{PublicURL: publicURL}
 }
 
-// stubAPI mimics the real routes: availability GET, checkout POST, and a
-// report GET that sets the same cache/robots headers as getReport.
+// stubAPI mimics checkout POST and report GET, preserving the same
+// cache/robots headers as getReport.
 func stubAPI(calls *int) *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/availability", func(w http.ResponseWriter, _ *http.Request) {
-		*calls++
-		writeJSON(w, map[string]bool{"reviewsDisabled": false})
-	})
 	mux.HandleFunc("POST /api/checkouts", func(w http.ResponseWriter, _ *http.Request) {
 		*calls++
 		writeJSON(w, map[string]string{"status": "PENDING"})
@@ -50,7 +46,7 @@ func TestCORSAllowedOrigin(t *testing.T) {
 
 	t.Run("actual GET carries the allow header and Vary", func(t *testing.T) {
 		calls = 0
-		request := httptest.NewRequest(http.MethodGet, "/api/availability", nil)
+		request := httptest.NewRequest(http.MethodGet, "/api/reports/abc", nil)
 		request.Header.Set("Origin", frontend)
 		response := httptest.NewRecorder()
 		handler.ServeHTTP(response, request)
@@ -176,7 +172,7 @@ func TestCORSDisallowedOrigins(t *testing.T) {
 	} {
 		t.Run("actual request from "+origin+" gets no allow header", func(t *testing.T) {
 			calls = 0
-			request := httptest.NewRequest(http.MethodGet, "/api/availability", nil)
+			request := httptest.NewRequest(http.MethodGet, "/api/reports/abc", nil)
 			request.Header.Set("Origin", origin)
 			response := httptest.NewRecorder()
 			handler.ServeHTTP(response, request)
@@ -213,8 +209,8 @@ func TestCORSRequestsWithoutOrigin(t *testing.T) {
 	var calls int
 	handler := service.withCORS(stubAPI(&calls))
 
-	t.Run("webhook and health style requests keep working", func(t *testing.T) {
-		request := httptest.NewRequest(http.MethodGet, "/api/availability", nil)
+	t.Run("requests without an Origin header keep working", func(t *testing.T) {
+		request := httptest.NewRequest(http.MethodGet, "/api/reports/abc", nil)
 		response := httptest.NewRecorder()
 		handler.ServeHTTP(response, request)
 		if response.Code != http.StatusOK {

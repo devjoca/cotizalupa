@@ -50,7 +50,7 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
 
 export type PrepareResult =
   | { status: "READY_FOR_PAYMENT"; report_token: string }
-  | { status: "REVIEWS_DISABLED" | "RATE_LIMITED" | "BUSY" | "INVALID_UPLOAD" | "PREPARATION_FAILED" | "STORAGE_FAILED"; message: string };
+  | { status: "RATE_LIMITED" | "BUSY" | "INVALID_UPLOAD" | "PREPARATION_FAILED" | "STORAGE_FAILED"; message: string };
 
 export function prepareReview(input: {
   files: File[];
@@ -86,8 +86,4 @@ export type CheckoutResult =
 
 export function beginCheckout(input: { data: { token: string } }): Promise<CheckoutResult> {
   return postJson("/api/checkouts", input.data);
-}
-
-export function getReviewsAvailability(): Promise<{ reviewsDisabled: boolean }> {
-  return getJson("/api/availability");
 }

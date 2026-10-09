@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 
-import { getReviewsAvailability } from "../lib/api";
 import { rememberMetaClick } from "../lib/adAttribution";
 
 import { Hero } from "../components/landing/Hero";
@@ -51,15 +50,8 @@ export const Route = createFileRoute("/")({
 });
 
 function Landing() {
-  // Fetched after render so the landing can be prerendered without the API.
-  // Until it answers, the page shows the open state; the server still refuses
-  // new orders while reviews are disabled.
-  const [reviewsDisabled, setReviewsDisabled] = useState(false);
   useEffect(() => {
     rememberMetaClick();
-    getReviewsAvailability()
-      .then((result) => setReviewsDisabled(result.reviewsDisabled))
-      .catch(() => {});
   }, []);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [flowKey, setFlowKey] = useState(0);
@@ -90,9 +82,7 @@ function Landing() {
       </header>
       <main>
         <div className="availability-note" role="status">
-          {reviewsDisabled
-            ? "Las revisiones aún no están disponibles. Explora el formulario o mira el reporte de ejemplo. No se enviarán archivos ni se realizarán cobros."
-            : "Revisa tus archivos antes de crear una orden. El pago único de $9.99 USD se abre desde el enlace privado; la IA analiza después de la confirmación."}
+          Revisa tus archivos antes de crear una orden. El pago único de $9.99 USD se abre desde el enlace privado; la IA analiza después de la confirmación.
         </div>
         <Hero onStart={startFlow} />
         <div className="category-strip">
@@ -107,14 +97,13 @@ function Landing() {
         <Example />
         <Method />
         <Pricing onStart={startFlow} />
-        <Faq reviewsDisabled={reviewsDisabled} />
+        <Faq />
         <Closing onStart={startFlow} />
       </main>
       <Footer />
       <ReviewDialog
         key={flowKey}
         open={dialogOpen}
-        reviewsDisabled={reviewsDisabled}
         onClose={() => setDialogOpen(false)}
       />
     </>

@@ -27,7 +27,7 @@ const FAQS: Array<{ question: string; answer: string }> = [
 
 ];
 
-export function Faq({ reviewsDisabled }: { reviewsDisabled: boolean }) {
+export function Faq() {
   return (
     <section className="section faq">
       <div>
@@ -39,9 +39,7 @@ export function Faq({ reviewsDisabled }: { reviewsDisabled: boolean }) {
       <div className="faq-list">
         <details>
           <summary>¿Puedo pagar y obtener un análisis real ahora?</summary>
-          <p>{reviewsDisabled
-            ? "No aceptamos nuevas revisiones en este momento. Puedes explorar el formulario y ver el reporte de ejemplo."
-            : "Sí. Primero revisas los archivos, creas la orden y abres el pago con Polar. Analizamos la cotización cuando Polar confirma el pago."}</p>
+          <p>Sí. Primero revisas los archivos, creas la orden y abres el pago con Polar. Analizamos la cotización cuando Polar confirma el pago.</p>
         </details>
         {FAQS.map((faq) => (
           <details key={faq.question}>
