@@ -2,8 +2,6 @@ module cotizalupa
 
 go 1.27.1
 
-toolchain go1.27.1
-
 require (
 	github.com/getsentry/sentry-go v0.49.0
 	github.com/google/uuid v1.6.0
