@@ -1,5 +1,5 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { ReportDocument } from "#/components/ReportDocument";
 import { beginCheckout, getPublicReport } from "#/lib/api";
@@ -48,10 +48,59 @@ function ReportLoadError() {
 }
 
 function ReportPage() {
-  const result = Route.useLoaderData();
+  const initialResult = Route.useLoaderData();
+  const [result, setResult] = useState(initialResult);
   const { token } = Route.useParams();
+  const [waitExpired, setWaitExpired] = useState(false);
+  const [refreshFailed, setRefreshFailed] = useState(false);
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setResult(initialResult);
+  }, [initialResult, token]);
+
+  useEffect(() => {
+    setWaitExpired(false);
+    setRefreshFailed(false);
+    if (result.status !== "PAYMENT_PENDING" && result.status !== "PROCESSING" && result.status !== "NOT_READY") return;
+
+    // A waiting limit offers support; it never declares a payment or job failed.
+    const controller = new AbortController();
+    const limit = result.status === "PROCESSING" ? 10 * 60_000 : 5 * 60_000;
+    let stopped = false;
+    let nextPoll: ReturnType<typeof setTimeout>;
+    const deadline = setTimeout(() => {
+      stopped = true;
+      clearTimeout(nextPoll);
+      controller.abort();
+      setWaitExpired(true);
+    }, limit);
+
+    async function poll() {
+      if (stopped) return;
+      if (!document.hidden) {
+        try {
+          const next = await getPublicReport({ data: { token }, signal: controller.signal });
+          if (stopped) return;
+          setRefreshFailed(next.status === "UNAVAILABLE");
+          if (next.status !== "UNAVAILABLE") setResult(next);
+        } catch {
+          if (stopped) return;
+          setRefreshFailed(true);
+        }
+      }
+      if (!stopped) nextPoll = setTimeout(poll, 5_000);
+    }
+
+    nextPoll = setTimeout(poll, 5_000);
+    return () => {
+      stopped = true;
+      clearTimeout(nextPoll);
+      clearTimeout(deadline);
+      controller.abort();
+    };
+  }, [token, result.status]);
 
   async function openCheckout() {
     if (checkoutBusy) return;
@@ -107,8 +156,8 @@ function ReportPage() {
       : result.status === "PAYMENT_PENDING"
       ? {
           eyebrow: "PAGO POR CONFIRMAR",
-          title: "Estamos esperando la confirmación del pago.",
-          detail: "Consulta el estado aquí. Si ya pagaste, no crees otra orden. Si Polar confirma que el checkout venció sin pago, esta orden se cerrará.",
+          title: "Estamos confirmando tu pago.",
+          detail: "Esta página se actualizará automáticamente. Cuando recibamos la confirmación, comenzaremos la revisión. Si ya pagaste, no vuelvas a pagar ni crees otra orden.",
         }
       : result.status === "REJECTED"
       ? {
@@ -143,9 +192,9 @@ function ReportPage() {
       : result.status === "PROCESSING"
       ? {
           eyebrow: "ANÁLISIS EN PROCESO",
-          title: "Tu reporte todavía no está listo.",
+          title: "Estamos revisando tu cotización.",
           detail:
-            "Estamos revisando la cotización. Te enviaremos el enlace por correo cuando el reporte esté listo. Puedes cerrar esta página y volver a abrir el mismo enlace.",
+            "Tu reporte aparecerá aquí automáticamente. También te enviaremos el enlace por correo cuando esté listo. Puedes cerrar esta página y volver a abrir el mismo enlace.",
         }
       : result.status === "NOT_FOUND"
         ? {
@@ -170,6 +219,20 @@ function ReportPage() {
         <p className="report-state__eyebrow">{content.eyebrow}</p>
         <h1>{content.title}</h1>
         <p>{content.detail}</p>
+        {refreshFailed && !waitExpired && (
+          <p role="status">No pudimos actualizar el estado. Volveremos a intentarlo automáticamente; si ya pagaste, no vuelvas a pagar.</p>
+        )}
+        {waitExpired && (
+          <div role="status">
+            <p>Esto está tardando más de lo esperado. No pudimos confirmar el avance; puedes escribirnos para que revisemos tu orden personalmente. Si ya pagaste, no vuelvas a pagar.</p>
+            <a className="report-state__link" href={`mailto:soporte@cotizalupa.com?subject=${encodeURIComponent("Ayuda con mi revisión")}&body=${encodeURIComponent(`Hola, mi revisión está tardando más de lo esperado. Este es mi enlace: ${window.location.origin}/r/${encodeURIComponent(token)}`)}`}>
+              Escribir a soporte@cotizalupa.com
+            </a>
+          </div>
+        )}
+        {waitExpired && result.status === "PAYMENT_PENDING" && (
+          <button type="button" onClick={() => window.location.reload()}>Actualizar estado</button>
+        )}
         {(result.status === "READY_FOR_PAYMENT" || result.status === "PAYMENT_PENDING") && (
           <button type="button" disabled={checkoutBusy} onClick={openCheckout}>
             {checkoutBusy ? "Consultando pago…" : result.status === "READY_FOR_PAYMENT" ? "Pagar revisión" : "Consultar pago"}

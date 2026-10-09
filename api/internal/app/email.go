@@ -3,15 +3,34 @@ package app
 import (
 	"bytes"
 	"context"
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"github.com/jackc/pgx/v5"
-	"html"
+	"html/template"
 	"io"
 	"net/http"
 	"net/url"
 	"time"
 )
+
+//go:embed report_email.html
+var reportEmailHTML string
+
+var reportEmailTemplate = template.Must(template.New("report-ready").Parse(reportEmailHTML))
+
+func renderReportEmail(reportURL string) (string, error) {
+	link, err := url.Parse(reportURL)
+	if err != nil {
+		return "", errors.New("email_request_invalid")
+	}
+	var output bytes.Buffer
+	err = reportEmailTemplate.Execute(&output, struct {
+		ReportURL       string
+		IllustrationURL string
+	}{reportURL, link.ResolveReference(&url.URL{Path: "/email/report-ready.png"}).String()})
+	return output.String(), err
+}
 
 type resendMailer struct {
 	APIKey string
@@ -27,6 +46,10 @@ func (m resendMailer) sendReport(ctx context.Context, orderID, recipient, report
 	}
 	const subject = "Tu reporte de CotizaLupa está listo"
 	text := "Tu reporte está listo. Puedes abrirlo en este enlace privado:\n\n" + reportURL + "\n\nPuedes guardar el reporte como PDF desde esa página. Guarda este correo y cuida el enlace: quien lo tenga podrá leer tu reporte.\n\nSi necesitas ayuda, escribe a soporte@cotizalupa.com."
+	markup, err := renderReportEmail(reportURL)
+	if err != nil {
+		return "", errors.New("email_request_invalid")
+	}
 	body, err := json.Marshal(struct {
 		From    string   `json:"from"`
 		To      []string `json:"to"`
@@ -35,7 +58,7 @@ func (m resendMailer) sendReport(ctx context.Context, orderID, recipient, report
 		HTML    string   `json:"html"`
 	}{
 		From: m.From, To: []string{recipient}, Subject: subject, Text: text,
-		HTML: "<p>Tu reporte de CotizaLupa está listo.</p><p><a href=\"" + html.EscapeString(reportURL) + "\">Abrir mi reporte</a></p><p>Puedes guardar el reporte como PDF desde esa página. Guarda este correo y cuida el enlace: quien lo tenga podrá leer tu reporte.</p><p>Si necesitas ayuda, escribe a soporte@cotizalupa.com.</p>",
+		HTML: markup,
 	})
 	if err != nil {
 		return "", errors.New("email_request_invalid")

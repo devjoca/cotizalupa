@@ -31,9 +31,9 @@ function apiUrl(path: string): string {
   return `${API_BASE_URL}${path}`;
 }
 
-async function getJson<T>(path: string): Promise<T> {
+async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
   // No Content-Type on bodyless GETs, so no CORS preflight is triggered.
-  const response = await fetch(apiUrl(path));
+  const response = await fetch(apiUrl(path), { signal });
   if (!response.ok) throw new Error(`Request failed (${response.status})`);
   return response.json() as Promise<T>;
 }
@@ -76,8 +76,8 @@ export type PublicReportResult =
   | { status: "READY_FOR_PAYMENT"; amountCents: number; currency: string }
   | { status: "COMPLETED"; analysis: Analysis };
 
-export function getPublicReport(input: { data: { token: string } }): Promise<PublicReportResult> {
-  return getJson(`/api/reports/${encodeURIComponent(input.data.token)}`);
+export function getPublicReport(input: { data: { token: string }; signal?: AbortSignal }): Promise<PublicReportResult> {
+  return getJson(`/api/reports/${encodeURIComponent(input.data.token)}`, input.signal);
 }
 
 export type CheckoutResult =
