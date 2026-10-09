@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -107,7 +108,7 @@ func TestCheckoutFreezeReleaseInLocalPostgres(t *testing.T) {
 	})
 }
 
-func TestCheckoutTaxInheritanceInLocalPostgres(t *testing.T) {
+func TestCheckoutCreationInLocalPostgres(t *testing.T) {
 	requireLocalDB(t)
 	ctx := context.Background()
 	db := isolatedDB(t)
@@ -128,17 +129,32 @@ func TestCheckoutTaxInheritanceInLocalPostgres(t *testing.T) {
 	}
 	inclusive, exclusive, location, empty := "inclusive", "exclusive", "location", ""
 	for _, tc := range []struct {
-		name  string
-		tax   *string
-		total int
-		want  string
+		name       string
+		tax        *string
+		total      int
+		want       string
+		reason     string
+		httpStatus int
+		overrides  map[string]any
 	}{
-		{"inherited Inclusive default", nil, 999, "CHECKOUT"},
-		{"explicit inclusive", &inclusive, 999, "CHECKOUT"},
-		{"explicit exclusive", &exclusive, 999, "PENDING"},
-		{"location based", &location, 999, "PENDING"},
-		{"unknown override", &empty, 999, "PENDING"},
-		{"inherited setting with added tax", nil, 1179, "PENDING"},
+		{name: "inherited Inclusive default", total: 999, want: "CHECKOUT"},
+		{name: "explicit inclusive", tax: &inclusive, total: 999, want: "CHECKOUT"},
+		{name: "explicit exclusive", tax: &exclusive, total: 999, want: "UNAVAILABLE", reason: "tax_behavior_not_inclusive"},
+		{name: "location based", tax: &location, total: 999, want: "UNAVAILABLE", reason: "tax_behavior_not_inclusive"},
+		{name: "unknown override", tax: &empty, total: 999, want: "UNAVAILABLE", reason: "tax_behavior_not_inclusive"},
+		{name: "inherited setting with added tax", total: 1179, want: "UNAVAILABLE", reason: "total_amount_mismatch"},
+		{name: "unauthorized", want: "UNAVAILABLE", reason: "polar_http_401", httpStatus: 401},
+		{name: "invalid request", want: "UNAVAILABLE", reason: "polar_http_422", httpStatus: 422},
+		{name: "provider failure", want: "UNAVAILABLE", reason: "polar_http_500", httpStatus: 500},
+		{name: "malformed response", want: "UNAVAILABLE", reason: "polar_request_failed", httpStatus: 200},
+		{name: "missing checkout ID", total: 999, want: "UNAVAILABLE", reason: "missing_checkout_id", overrides: map[string]any{"id": ""}},
+		{name: "missing URL", total: 999, want: "UNAVAILABLE", reason: "missing_checkout_url", overrides: map[string]any{"url": ""}},
+		{name: "wrong product", total: 999, want: "UNAVAILABLE", reason: "product_mismatch", overrides: map[string]any{"product_id": "other"}},
+		{name: "wrong amount", total: 999, want: "UNAVAILABLE", reason: "amount_mismatch", overrides: map[string]any{"amount": 1000}},
+		{name: "wrong currency", total: 999, want: "UNAVAILABLE", reason: "currency_mismatch", overrides: map[string]any{"currency": "pen"}},
+		{name: "free price", total: 999, want: "UNAVAILABLE", reason: "free_product_price", overrides: map[string]any{"is_free_product_price": true}},
+		{name: "no payment required", total: 999, want: "UNAVAILABLE", reason: "payment_not_required", overrides: map[string]any{"is_payment_required": false}},
+		{name: "missing price", total: 999, want: "UNAVAILABLE", reason: "missing_product_price", overrides: map[string]any{"product_price": nil}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			orderID := uuid.NewString()
@@ -154,17 +170,31 @@ func TestCheckoutTaxInheritanceInLocalPostgres(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			var logs bytes.Buffer
+			previousLogger := slog.Default()
+			slog.SetDefault(slog.New(slog.NewJSONHandler(&logs, nil)))
+			t.Cleanup(func() { slog.SetDefault(previousLogger) })
 			creates := 0
 			polar := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.Method == http.MethodPost {
 					creates++
 				}
-				_ = json.NewEncoder(w).Encode(map[string]any{
+				if tc.httpStatus != 0 {
+					w.WriteHeader(tc.httpStatus)
+					_, _ = w.Write([]byte("private-provider-body"))
+					return
+				}
+				payload := map[string]any{
 					"id": "checkout_1", "url": "https://sandbox.polar.sh/checkout/synthetic", "status": "open",
 					"product_id": "product_1", "amount": 999, "total_amount": tc.total, "currency": "usd",
 					"is_free_product_price": false, "is_payment_required": true,
-					"product_price": map[string]any{"tax_behavior": tc.tax},
-				})
+					"product_price":  map[string]any{"tax_behavior": tc.tax},
+					"customer_email": "private-customer@example.com", "client_secret": "private-provider-secret",
+				}
+				for key, value := range tc.overrides {
+					payload[key] = value
+				}
+				_ = json.NewEncoder(w).Encode(payload)
 			}))
 			defer polar.Close()
 			publicURL, _ := url.Parse("http://localhost:3002")
@@ -181,6 +211,21 @@ func TestCheckoutTaxInheritanceInLocalPostgres(t *testing.T) {
 			}
 			if got := call(); got != tc.want {
 				t.Fatalf("checkout result = %s, want %s", got, tc.want)
+			}
+			if tc.reason != "" {
+				var event struct {
+					Message string `json:"msg"`
+					Reason  string `json:"reason"`
+					OrderID string `json:"order_id"`
+				}
+				if err := json.Unmarshal(logs.Bytes(), &event); err != nil || event.Message != "polar_checkout_failed" || event.Reason != tc.reason || event.OrderID != orderID {
+					t.Fatalf("unexpected operational diagnostic: %s (%v)", logs.String(), err)
+				}
+			}
+			for _, private := range []string{token, "private-provider-body", "private-customer@example.com", "private-provider-secret", "https://sandbox.polar.sh/checkout/synthetic", "synthetic quotation"} {
+				if strings.Contains(logs.String(), private) {
+					t.Fatal("operational logs contain private checkout data")
+				}
 			}
 			var status string
 			var checkoutID *string

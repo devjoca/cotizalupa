@@ -46,6 +46,12 @@ type polarCheckoutRequest struct {
 
 var errInvalidOriginal = errors.New("stored original is invalid")
 
+type polarHTTPError int
+
+func (status polarHTTPError) Error() string {
+	return fmt.Sprintf("Polar checkout status %d", status)
+}
+
 // polarRequest sends data as the JSON body when it is non-nil.
 func (a *App) polarRequest(ctx context.Context, method, path string, data *polarCheckoutRequest) (polarCheckout, error) {
 	var checkout polarCheckout
@@ -73,12 +79,47 @@ func (a *App) polarRequest(ctx context.Context, method, path string, data *polar
 	}
 	defer response.Body.Close()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return checkout, fmt.Errorf("Polar checkout status %d", response.StatusCode)
+		return checkout, polarHTTPError(response.StatusCode)
 	}
 	if err := json.NewDecoder(io.LimitReader(response.Body, 1<<20)).Decode(&checkout); err != nil {
 		return checkout, err
 	}
 	return checkout, nil
+}
+
+// Reasons are fixed codes so provider payloads and request errors never enter logs.
+func (a *App) checkoutFailureReason(checkout polarCheckout, err error) string {
+	if err != nil {
+		var status polarHTTPError
+		if errors.As(err, &status) {
+			return fmt.Sprintf("polar_http_%d", status)
+		}
+		return "polar_request_failed"
+	}
+	switch {
+	case checkout.ID == "":
+		return "missing_checkout_id"
+	case checkout.URL == "":
+		return "missing_checkout_url"
+	case checkout.ProductID != a.PolarProductID:
+		return "product_mismatch"
+	case checkout.Amount != reviewPriceCents:
+		return "amount_mismatch"
+	case checkout.TotalAmount != reviewPriceCents:
+		return "total_amount_mismatch"
+	case checkout.Currency != "usd":
+		return "currency_mismatch"
+	case checkout.IsFreeProductPrice:
+		return "free_product_price"
+	case !checkout.IsPaymentRequired:
+		return "payment_not_required"
+	case checkout.ProductPrice == nil:
+		return "missing_product_price"
+	case checkout.ProductPrice.TaxBehavior != nil && *checkout.ProductPrice.TaxBehavior != "inclusive":
+		return "tax_behavior_not_inclusive"
+	default:
+		return ""
+	}
 }
 
 func (a *App) storedFilesMatch(ctx context.Context, orderID string) error {
@@ -223,16 +264,19 @@ func (a *App) checkout(w http.ResponseWriter, r *http.Request) {
 	})
 	// A null price override inherits the organization's required Inclusive default.
 	// An explicit override must also be inclusive; signed payment totals are checked separately.
-	if err != nil || checkout.ID == "" || checkout.URL == "" || checkout.ProductID != a.PolarProductID || checkout.Amount != reviewPriceCents || checkout.TotalAmount != reviewPriceCents || checkout.Currency != "usd" || checkout.IsFreeProductPrice || !checkout.IsPaymentRequired || checkout.ProductPrice == nil || (checkout.ProductPrice.TaxBehavior != nil && *checkout.ProductPrice.TaxBehavior != "inclusive") {
+	if reason := a.checkoutFailureReason(checkout, err); reason != "" {
 		a.releaseCheckoutFreeze(orderID)
-		CaptureOperationalError("polar_checkout_failed", map[string]string{"order_id": orderID})
-		writeJSON(w, checkoutPending.response())
+		slog.Error("polar_checkout_failed", "order_id", orderID, "reason", reason)
+		CaptureOperationalError("polar_checkout_failed", map[string]string{"order_id": orderID, "reason": reason})
+		writeJSON(w, checkoutUnavailable.response())
 		return
 	}
 	result, err = a.DB.Exec(r.Context(), `UPDATE orders SET payment_transaction_id=$2,updated_at=now() WHERE id=$1 AND status='PAYMENT_PENDING' AND payment_provider='polar' AND payment_transaction_id IS NULL`, orderID, checkout.ID)
 	if err != nil || result.RowsAffected() != 1 {
 		a.releaseCheckoutFreeze(orderID)
-		writeJSON(w, checkoutPending.response())
+		slog.Error("polar_checkout_failed", "order_id", orderID, "reason", "checkout_registration_failed")
+		CaptureOperationalError("polar_checkout_failed", map[string]string{"order_id": orderID, "reason": "checkout_registration_failed"})
+		writeJSON(w, checkoutUnavailable.response())
 		return
 	}
 	writeJSON(w, checkoutRedirect(checkout.URL))
