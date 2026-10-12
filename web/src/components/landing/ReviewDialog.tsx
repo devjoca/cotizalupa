@@ -406,7 +406,7 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
               <div className="demo-banner">
                 <strong>Crear la orden no realiza ningún cobro.</strong>
                 <br />
-                Guardaremos tus archivos y te daremos un enlace privado. Desde allí podrás abrir el pago. El análisis comenzará después de que Polar confirme el pago.
+                Guardaremos tus archivos y te daremos un enlace privado para completar el pago. Empezaremos a revisar la cotización cuando el pago quede confirmado.
               </div>
               <button
                 type="button"

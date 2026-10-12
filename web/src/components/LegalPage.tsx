@@ -8,12 +8,28 @@ type LegalPageProps = {
 };
 
 export function legalPageHead(path: string, title: string, description: string) {
+  const pageTitle = `${title} | CotizaLupa`;
+  const url = `https://cotizalupa.com${path}`;
+  const image = "https://cotizalupa.com/og.png";
+
   return {
     meta: [
-      { title: `${title} | CotizaLupa` },
+      { title: pageTitle },
       { name: "description", content: description },
+      { property: "og:type", content: "website" },
+      { property: "og:title", content: pageTitle },
+      { property: "og:description", content: description },
+      { property: "og:url", content: url },
+      { property: "og:image", content: image },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: pageTitle },
+      { name: "twitter:description", content: description },
+      { name: "twitter:image", content: image },
     ],
-    links: [{ rel: "canonical", href: `https://cotizalupa.com${path}` }],
+    links: [
+      { rel: "canonical", href: url },
+      { rel: "alternate", hrefLang: "es", href: url },
+    ],
   };
 }
 

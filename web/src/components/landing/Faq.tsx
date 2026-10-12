@@ -1,4 +1,9 @@
-const FAQS: Array<{ question: string; answer: string }> = [
+export const FAQ_ITEMS: Array<{ question: string; answer: string }> = [
+  {
+    question: "¿Puedo pedir una revisión ahora?",
+    answer:
+      "Sí. Primero revisas los archivos y creas la orden. Después recibirás un enlace privado para completar el pago. Empezamos a revisar tu cotización cuando el pago queda confirmado.",
+  },
   {
     question: "¿Sirve para mi tipo de cotización?",
     answer:
@@ -7,7 +12,7 @@ const FAQS: Array<{ question: string; answer: string }> = [
   {
     question: "¿Me dirá si me están cobrando de más?",
     answer:
-      "No. No comparamos precios de mercado. Buscamos importes ambiguos, conceptos que podrían generar adicionales y condiciones de pago que conviene precisar.",
+      "No podemos decirte si el precio es caro o barato: cada cotización depende de lo que incluye y muchas no tienen una referencia pública comparable. Sí revisamos si los importes se entienden, si podrían aparecer cobros adicionales y qué condiciones te conviene confirmar.",
   },
   {
     question: "¿Y si ya pagué o acepté la cotización?",
@@ -17,7 +22,7 @@ const FAQS: Array<{ question: string; answer: string }> = [
   {
     question: "¿Necesito compartir mis datos personales?",
     answer:
-      "Puedes ocultar nombres, teléfonos, DNI/RUC y direcciones que no sean necesarios. Conserva el alcance, los montos, fechas y condiciones. Guardamos temporalmente los archivos al crear la orden y solo los enviamos a OpenAI después del pago. Eliminamos originales elegibles en una limpieza mensual. El reporte y los datos extraídos se conservan para su consulta.",
+      "Puedes ocultar nombres, teléfonos, DNI/RUC y direcciones que no sean necesarios. Conserva el alcance, los montos, fechas y condiciones. Guardamos temporalmente los archivos al crear la orden y solo los enviamos a un servicio de IA después del pago para preparar el reporte. Eliminamos los originales elegibles durante una limpieza mensual. El reporte y los datos extraídos se conservan para que puedas consultarlos.",
   },
   {
     question: "¿La revisión garantiza que todo está bien?",
@@ -37,11 +42,7 @@ export function Faq() {
         </p>
       </div>
       <div className="faq-list">
-        <details>
-          <summary>¿Puedo pagar y obtener un análisis real ahora?</summary>
-          <p>Sí. Primero revisas los archivos, creas la orden y abres el pago con Polar. Analizamos la cotización cuando Polar confirma el pago.</p>
-        </details>
-        {FAQS.map((faq) => (
+        {FAQ_ITEMS.map((faq) => (
           <details key={faq.question}>
             <summary>{faq.question}</summary>
             <p>{faq.answer}</p>
