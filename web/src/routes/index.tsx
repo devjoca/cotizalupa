@@ -10,7 +10,7 @@ import { RoleCards } from "../components/landing/RoleCards";
 import { Example } from "../components/landing/Example";
 import { Method } from "../components/landing/Method";
 import { Pricing } from "../components/landing/Pricing";
-import { Faq } from "../components/landing/Faq";
+import { FAQ_ITEMS, Faq } from "../components/landing/Faq";
 import { Closing, Footer } from "../components/landing/Closing";
 import { ReviewDialog } from "../components/landing/ReviewDialog";
 import { Icon } from "../components/landing/Icon";
@@ -20,6 +20,36 @@ const TITLE = "Revisa tu cotización antes de pagar | CotizaLupa";
 const DESCRIPTION =
   "Sube tu cotización en PDF o foto y recibe un reporte con lo que está claro, lo que falta aclarar y las preguntas para tu proveedor. $9.99 USD, pago único.";
 const OG_IMAGE = `${SITE}/og.png`;
+const FAQ_SCHEMA = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: FAQ_ITEMS.map(({ question, answer }) => ({
+    "@type": "Question",
+    name: question,
+    acceptedAnswer: {
+      "@type": "Answer",
+      text: answer,
+    },
+  })),
+};
+const PRODUCT_SCHEMA = {
+  "@context": "https://schema.org",
+  "@type": "Product",
+  name: "Revisión de cotizaciones de CotizaLupa",
+  description: DESCRIPTION,
+  image: OG_IMAGE,
+  brand: {
+    "@type": "Brand",
+    name: "CotizaLupa",
+  },
+  offers: {
+    "@type": "Offer",
+    url: `${SITE}/`,
+    price: "9.99",
+    priceCurrency: "USD",
+    availability: "https://schema.org/InStock",
+  },
+};
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -28,7 +58,7 @@ export const Route = createFileRoute("/")({
       { name: "description", content: DESCRIPTION },
       { property: "og:type", content: "website" },
       { property: "og:site_name", content: "CotizaLupa" },
-      { property: "og:locale", content: "es_PE" },
+      { property: "og:locale", content: "es_LA" },
       { property: "og:url", content: `${SITE}/` },
       { property: "og:title", content: TITLE },
       { property: "og:description", content: DESCRIPTION },
@@ -36,17 +66,25 @@ export const Route = createFileRoute("/")({
       { property: "og:image:width", content: "1200" },
       { property: "og:image:height", content: "630" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: TITLE },
+      { name: "twitter:description", content: DESCRIPTION },
+      { name: "twitter:image", content: OG_IMAGE },
       {
         "script:ld+json": {
           "@context": "https://schema.org",
           "@type": "WebSite",
           name: "CotizaLupa",
           url: `${SITE}/`,
-          inLanguage: "es-PE",
+          inLanguage: "es",
         },
       },
+      { "script:ld+json": FAQ_SCHEMA },
+      { "script:ld+json": PRODUCT_SCHEMA },
     ],
-    links: [{ rel: "canonical", href: `${SITE}/` }],
+    links: [
+      { rel: "canonical", href: `${SITE}/` },
+      { rel: "alternate", hrefLang: "es", href: `${SITE}/` },
+    ],
   }),
   component: Landing,
 });

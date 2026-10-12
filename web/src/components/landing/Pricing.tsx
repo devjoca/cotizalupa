@@ -6,8 +6,8 @@ export function Pricing({ onStart }: { onStart: () => void }) {
       <div className="price-copy">
         <h2>Un solo pago.</h2>
         <p>
-          No comparamos precios. Buscamos lo que falta precisar antes de
-          aceptar o pagar.
+          Cada cotización depende de lo que incluye y de sus condiciones.
+          Te ayudamos a ver qué conviene aclarar antes de aceptar o pagar.
         </p>
       </div>
       <div className="price-card">

@@ -310,7 +310,7 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
                 </div>
               )}
               <p className="privacy-note">
-                Puedes ocultar nombres, teléfonos, DNI/RUC y direcciones. El
+                Puedes ocultar nombres, teléfonos, documento de identidad y direcciones. El
                 archivo se guardará temporalmente al crear la orden.
                 CotizaLupa lo analizará después del pago.
                 Eliminamos los originales elegibles en una limpieza mensual.
@@ -406,7 +406,7 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
               <div className="demo-banner">
                 <strong>Crear la orden no realiza ningún cobro.</strong>
                 <br />
-                Guardaremos tus archivos y te daremos un enlace privado. Desde allí podrás abrir el pago. El análisis comenzará después de que Polar confirme el pago.
+                Guardaremos tus archivos y te daremos un enlace privado para completar el pago. Empezaremos a revisar la cotización cuando el pago quede confirmado.
               </div>
               <button
                 type="button"
