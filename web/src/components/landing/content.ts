@@ -1,4 +1,4 @@
-// Landing copy and demo data. Identifiers in English; user-facing strings in es-PE.
+// Landing copy and demo data. Identifiers in English; user-facing strings in neutral LatAm Spanish. Examples retain PEN proof data.
 
 import type { Analysis } from "#/lib/schemas";
 

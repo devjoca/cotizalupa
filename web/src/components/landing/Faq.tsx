@@ -22,7 +22,7 @@ export const FAQ_ITEMS: Array<{ question: string; answer: string }> = [
   {
     question: "¿Necesito compartir mis datos personales?",
     answer:
-      "Puedes ocultar nombres, teléfonos, DNI/RUC y direcciones que no sean necesarios. Conserva el alcance, los montos, fechas y condiciones. Guardamos temporalmente los archivos al crear la orden y solo los enviamos a un servicio de IA después del pago para preparar el reporte. Eliminamos los originales elegibles durante una limpieza mensual. El reporte y los datos extraídos se conservan para que puedas consultarlos.",
+      "Puedes ocultar nombres, teléfonos, documento de identidad y direcciones que no sean necesarios. Conserva el alcance, los montos, fechas y condiciones. Guardamos temporalmente los archivos al crear la orden y solo los enviamos a un servicio de IA después del pago para preparar el reporte. Eliminamos los originales elegibles durante una limpieza mensual. El reporte y los datos extraídos se conservan para que puedas consultarlos.",
   },
   {
     question: "¿La revisión garantiza que todo está bien?",

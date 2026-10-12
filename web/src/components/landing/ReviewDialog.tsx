@@ -310,7 +310,7 @@ export function ReviewDialog({ open, onClose }: ReviewDialogProps) {
                 </div>
               )}
               <p className="privacy-note">
-                Puedes ocultar nombres, teléfonos, DNI/RUC y direcciones. El
+                Puedes ocultar nombres, teléfonos, documento de identidad y direcciones. El
                 archivo se guardará temporalmente al crear la orden.
                 CotizaLupa lo analizará después del pago.
                 Eliminamos los originales elegibles en una limpieza mensual.
